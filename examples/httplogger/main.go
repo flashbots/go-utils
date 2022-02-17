@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/flashbots/goutils/httplogger"
+	"github.com/flashbots/go-utils/httplogger"
 )
 
 var (

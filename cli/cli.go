@@ -1,5 +1,5 @@
-// Package goutils implements various reusable utility functions.
-package goutils
+// Package cli implements various reusable utility functions for command-line interfaces.
+package cli
 
 import (
 	"os"

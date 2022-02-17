@@ -1,4 +1,4 @@
-module github.com/flashbots/goutils
+module github.com/flashbots/go-utils
 
 go 1.17
 
