@@ -7,9 +7,16 @@ Various reusable Go utilities and modules
 
 ### httplogger
 
-Logging middleware for HTTP requests using `go-ethereum/log`.
+Logging middleware for HTTP requests using [`go-ethereum/log`](https://github.com/ethereum/go-ethereum/tree/master/log).
+See [`examples/httplogger/main.go`](https://github.com/flashbots/goutils/blob/main/examples/httplogger/main.go)
 
-See `examples/httplogger/main.go`
+Install:
+
+```bash
+go get github.com/flashbots/goutils/httplogger
+```
+
+Use:
 
 ```go
 mux := http.NewServeMux()

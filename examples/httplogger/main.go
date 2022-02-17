@@ -11,7 +11,7 @@ import (
 
 var (
 	listenAddr = "localhost:8124"
-	logJson    = os.Getenv("LOG_JSON") == "1"
+	logJSON    = os.Getenv("LOG_JSON") == "1"
 )
 
 func HelloHandler(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +30,7 @@ func PanicHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	logFormat := log.TerminalFormat(true)
-	if logJson {
+	if logJSON {
 		logFormat = log.JSONFormat()
 	}
 

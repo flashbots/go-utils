@@ -1,3 +1,4 @@
+// Package httplogger implements a middleware that logs the incoming HTTP request & its duration using go-ethereum-log.
 package httplogger
 
 import (
