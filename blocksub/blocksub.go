@@ -1,8 +1,10 @@
-// Package blocksub implements an Ethereum block subscriber that works with either a websocket or a polling or both.
+// Package blocksub implements an Ethereum block subscriber that works with polling and/or websockets.
 package blocksub
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -12,16 +14,21 @@ import (
 	"go.uber.org/atomic"
 )
 
+var ErrStopped = errors.New("already stopped")
+
 type BlockSub struct {
 	PollTimeout time.Duration // 10 seconds by default (8,640 requests per day)
 	SubTimeout  time.Duration // 60 seconds by default, after this timeout the subscriber will reconnect
 	DebugOutput bool
 
 	ethNodeHTTPURI      string // usually port 8545
-	ethNodeWebsocketURI string // usually port 9546
+	ethNodeWebsocketURI string // usually port 8546
 
-	headerC chan<- *ethtypes.Header
+	subscriptions []*Subscription
+
 	ctx     context.Context
+	cancel  context.CancelFunc
+	stopped atomic.Bool
 
 	httpClient      *ethclient.Client
 	wsClient        *ethclient.Client
@@ -32,50 +39,97 @@ type BlockSub struct {
 	CurrentBlockNumber uint64
 	CurrentBlockHash   string
 
-	latestWsHeader *ethtypes.Header
-	wsIsConnecting atomic.Bool
+	latestWsHeader   *ethtypes.Header
+	wsIsConnecting   atomic.Bool
+	wsConnectingCond sync.Cond
 }
 
-func NewBlockSub(ctx context.Context, ethNodeHTTPURI string, ethNodeWebsocketURI string, ch chan<- *ethtypes.Header) *BlockSub {
+func NewBlockSub(ctx context.Context, ethNodeHTTPURI string, ethNodeWebsocketURI string) *BlockSub {
+	ctx, cancel := context.WithCancel(ctx)
 	sub := &BlockSub{
 		PollTimeout:         10 * time.Second,
 		SubTimeout:          60 * time.Second,
 		ethNodeHTTPURI:      ethNodeHTTPURI,
 		ethNodeWebsocketURI: ethNodeWebsocketURI,
-		headerC:             ch,
 		ctx:                 ctx,
+		cancel:              cancel,
 		internalHeaderC:     make(chan *ethtypes.Header),
 	}
 	return sub
 }
 
+func (s *BlockSub) IsRunning() bool {
+	return !s.stopped.Load()
+}
+
+// Subscribe is used to create a new subscription.
+func (s *BlockSub) Subscribe(ctx context.Context) Subscription {
+	sub := NewSubscription(ctx)
+	if s.stopped.Load() {
+		sub.Unsubscribe()
+	} else {
+		go sub.run()
+		s.subscriptions = append(s.subscriptions, &sub)
+	}
+	return sub
+}
+
+// Start starts polling and websocket threads.
 func (s *BlockSub) Start() (err error) {
+	if s.stopped.Load() {
+		return ErrStopped
+	}
+
 	go s.runListener()
+
+	if s.ethNodeWebsocketURI != "" {
+		err = s.startWebsocket(false)
+		if err != nil {
+			return err
+		}
+	}
 
 	if s.ethNodeHTTPURI != "" {
 		log.Info("BlockSub:Start - HTTP connecting...", "uri", s.ethNodeHTTPURI)
 		s.httpClient, err = ethclient.Dial(s.ethNodeHTTPURI)
+		if err != nil { // using an invalid port will NOT return an error here, only at polling
+			return err
+		}
+
+		// Ensure that polling works
+		err = s._pollNow()
 		if err != nil {
 			return err
 		}
-		log.Info("BlockSub:Start - HTTP connected", "uri", s.ethNodeHTTPURI)
-		go s.runPollThread()
-	}
 
-	if s.ethNodeWebsocketURI != "" {
-		go s.startWebsocket()
+		log.Info("BlockSub:Start - HTTP connected", "uri", s.ethNodeHTTPURI)
+		go s.runPoller()
 	}
 
 	return nil
 }
 
-// Listens to internal headers and forwards them to the subscriber if it's the header has a greater blockNumber or different hash than the previous one.
-// Quits if the context is done.
+// Stop closes all subscriptions and stops the polling and websocket threads.
+func (s *BlockSub) Stop() {
+	if s.stopped.Swap(true) {
+		return
+	}
+
+	for _, sub := range s.subscriptions {
+		sub.Unsubscribe()
+	}
+
+	s.cancel()
+}
+
+// Listens to internal headers and forwards them to the subscriber if the header has a greater blockNumber or different hash than the previous one.
 func (s *BlockSub) runListener() {
 	for {
 		select {
 		case <-s.ctx.Done():
+			s.Stop() // ensures all subscribers are properly closed
 			return
+
 		case header := <-s.internalHeaderC:
 			// use the new header if it's later or has a different hash than the previous known one
 			if header.Number.Uint64() >= s.CurrentBlockNumber && header.Hash().Hex() != s.CurrentBlockHash {
@@ -83,49 +137,70 @@ func (s *BlockSub) runListener() {
 				s.CurrentBlockNumber = header.Number.Uint64()
 				s.CurrentBlockHash = header.Hash().Hex()
 
-				// Send to subscriber
-				s.headerC <- header
+				// Send to each subscriber
+				for _, sub := range s.subscriptions {
+					if sub.stopped.Load() {
+						continue
+					}
+
+					select {
+					case sub.C <- header:
+					default:
+					}
+				}
 			}
 		}
 	}
 }
 
-func (s *BlockSub) runPollThread() {
+func (s *BlockSub) runPoller() {
+	ch := time.After(s.PollTimeout)
 	for {
-		if s.ctx.Err() != nil {
+		select {
+		case <-s.ctx.Done():
 			return
+		case <-ch:
+			err := s._pollNow()
+			if err != nil {
+				log.Error("BlockSub: polling latest block failed", "err", err)
+			}
+			ch = time.After(s.PollTimeout)
 		}
-
-		header, err := s.httpClient.HeaderByNumber(s.ctx, nil)
-		if err != nil {
-			log.Error("BlockSub: polling latest block failed", "err", err)
-			time.Sleep(s.PollTimeout)
-			continue
-		}
-
-		if s.DebugOutput {
-			log.Debug("BlockSub: polled block", "number", header.Number.Uint64(), "hash", header.Hash().Hex())
-		}
-		s.internalHeaderC <- header
-
-		// Ensure websocket is still working (force a reconnect if it lags behind)
-		if s.latestWsHeader != nil && s.latestWsHeader.Number.Uint64() < header.Number.Uint64()-2 {
-			log.Warn("BlockSub: forcing websocket reconnect from polling", "wsBlockNum", s.latestWsHeader.Number.Uint64(), "pollBlockNum", header.Number.Uint64())
-			go s.startWebsocket()
-		}
-
-		time.Sleep(s.PollTimeout)
 	}
 }
 
-// startWebsocket repeatedly tries to establish a websocket connection to the node until it is connected.
-// If another instance is connecting it will return immediately.
-func (s *BlockSub) startWebsocket() {
-	if isAlreadyConnecting := s.wsIsConnecting.Swap(true); isAlreadyConnecting {
-		return
+func (s *BlockSub) _pollNow() error {
+	header, err := s.httpClient.HeaderByNumber(s.ctx, nil)
+	if err != nil {
+		return err
 	}
 
-	defer s.wsIsConnecting.Store(false)
+	if s.DebugOutput {
+		log.Debug("BlockSub: polled block", "number", header.Number.Uint64(), "hash", header.Hash().Hex())
+	}
+	s.internalHeaderC <- header
+
+	// Ensure websocket is still working (force a reconnect if it lags behind)
+	if s.latestWsHeader != nil && s.latestWsHeader.Number.Uint64() < header.Number.Uint64()-2 {
+		log.Warn("BlockSub: forcing websocket reconnect from polling", "wsBlockNum", s.latestWsHeader.Number.Uint64(), "pollBlockNum", header.Number.Uint64())
+		go s.startWebsocket(true)
+	}
+
+	return nil
+}
+
+// startWebsocket tries to establish a websocket connection to the node. If retryForever is true it will retry forever, until it is connected.
+// Also blocks if another instance is currently connecting.
+func (s *BlockSub) startWebsocket(retryForever bool) error {
+	if isAlreadyConnecting := s.wsIsConnecting.Swap(true); isAlreadyConnecting {
+		s.wsConnectingCond.Wait()
+		return nil
+	}
+
+	defer func() {
+		s.wsIsConnecting.Store(false)
+		s.wsConnectingCond.Broadcast()
+	}()
 
 	for {
 		if s.wsClient != nil {
@@ -133,10 +208,10 @@ func (s *BlockSub) startWebsocket() {
 		}
 
 		err := s._startWebsocket()
-		if err != nil {
-			log.Error("BlockSub: Websocket connection failed", "err", err)
+		if err != nil && retryForever {
+			log.Error("BlockSub:startWebsocket failed, retrying...", "err", err)
 		} else {
-			return
+			return err
 		}
 	}
 }
@@ -157,34 +232,36 @@ func (s *BlockSub) _startWebsocket() (err error) {
 
 	// Listen for headers and errors, and reconnect if needed
 	go func() {
-		var t = time.NewTimer(s.SubTimeout)
+		var timer = time.NewTimer(s.SubTimeout)
 
 		for {
 			select {
+			case <-s.ctx.Done():
+				return
+
 			case err := <-s.wsClientSub.Err():
 				if err == nil { // shutdown
 					return
 				}
 
 				// reconnect
-				log.Error("BlockSub: headerSub failed, reconnect now", "err", err)
-				s.startWebsocket()
+				log.Warn("BlockSub: headerSub failed, reconnect now", "err", err)
+				go s.startWebsocket(true)
 				return
 
-			case <-t.C:
-				log.Error("BlockSub: timeout, reconnect now", "timeout", s.SubTimeout)
-				s.startWebsocket()
+			case <-timer.C:
+				log.Warn("BlockSub: timeout, reconnect now", "timeout", s.SubTimeout)
+				go s.startWebsocket(true)
 				return
 
 			case header := <-wsHeaderC:
-				t.Reset(s.SubTimeout)
+				timer.Reset(s.SubTimeout)
 				if s.DebugOutput {
 					log.Debug("BlockSub: sub block", "number", header.Number.Uint64(), "hash", header.Hash().Hex())
 				}
 				s.latestWsHeader = header
 				s.internalHeaderC <- header
 			}
-
 		}
 	}()
 

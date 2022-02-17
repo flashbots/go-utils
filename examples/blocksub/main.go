@@ -4,10 +4,8 @@ import (
 	"context"
 	"os"
 
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/go-utils/blocksub"
-	"github.com/flashbots/go-utils/cli"
 )
 
 var (
@@ -17,8 +15,7 @@ var (
 	logDebug = os.Getenv("DEBUG") == "1"
 )
 
-func main() {
-	// Setup logging
+func logSetup() {
 	logLevel := log.LvlInfo
 	if logDebug {
 		logLevel = log.LvlDebug
@@ -30,16 +27,26 @@ func main() {
 	}
 
 	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, logFormat)))
+}
 
-	// Setup BlockSub
-	ch := make(chan *ethtypes.Header)
-	blocksub := blocksub.NewBlockSub(context.Background(), httpURI, wsURI, ch)
+func main() {
+	logSetup()
+
+	DemoSimpleSub(httpURI, wsURI)
+	// DemoMultiSub(httpURI, wsURI)
+}
+
+func DemoSimpleSub(httpURI, wsURI string) {
+	// Create and start a BlockSub instance
+	blocksub := blocksub.NewBlockSub(context.Background(), httpURI, wsURI)
 	blocksub.DebugOutput = true
-	err := blocksub.Start()
-	cli.CheckErr(err)
+	if err := blocksub.Start(); err != nil {
+		log.Crit(err.Error())
+	}
 
-	// Wait for new headers to arrive
-	for h := range ch {
-		log.Info("got header", "number", h.Number.Uint64(), "hash", h.Hash().Hex())
+	// Create a subscription to new headers
+	sub := blocksub.Subscribe(context.Background())
+	for header := range sub.C {
+		log.Info("new header", "number", header.Number.Uint64(), "hash", header.Hash().Hex())
 	}
 }

@@ -37,25 +37,25 @@ Minimal JSON-RPC client implementation.
 
 Subscribe for new Ethereum block headers by polling and/or websocket subscription
 
-See [`examples/blocksub/main.go`](https://github.com/flashbots/goutils/blob/main/examples/blocksub/main.go)
+See [`examples/blocksub/main.go`](https://github.com/flashbots/goutils/blob/main/examples/blocksub/main.go) and [`examples/blocksub/multisub.go`](https://github.com/flashbots/goutils/blob/main/examples/blocksub/multisub.go)
 
 Install:
 
 ```bash
-go get github.com/flashbots/goutils/blocksub
+go get github.com/flashbots/go-utils/blocksub
 ```
 
 Use:
 
 ```go
-ch := make(chan *ethtypes.Header)
-blocksub := blocksub.NewBlockSub(context.Background(), httpURI, wsURI, ch)
-err := blocksub.Start()
-if err != nil {
+blocksub := blocksub.NewBlockSub(context.Background(), httpURI, wsURI)
+if err := blocksub.Start(); err != nil {
     panic(err)
 }
 
-for header := range ch {
-    log.Info("got header", "number", header.Number.Uint64(), "hash", header.Hash().Hex())
+// Subscribe to new headers
+sub := blocksub.Subscribe(context.Background())
+for header := range sub.C {
+    fmt.Println("new header", header.Number.Uint64(), header.Hash().Hex())
 }
 ```
