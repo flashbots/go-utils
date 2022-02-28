@@ -27,3 +27,7 @@ mux := http.NewServeMux()
 mux.HandleFunc("/v1/hello", HelloHandler)
 loggedRouter := httplogger.LoggingMiddleware(r)
 ```
+
+## `jsonrpc`
+
+Minimal JSON-RPC client implementation.
