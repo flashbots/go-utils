@@ -44,6 +44,12 @@ func SendJSONRPCRequest(req JSONRPCRequest, url string) (res *JSONRPCResponse, e
 	return res, nil
 }
 
+// SendNewJSONRPCRequest constructs a request and sends it to the URL
+func SendNewJSONRPCRequest(id interface{}, method string, args interface{}, url string) (res *JSONRPCResponse, err error) {
+	req := NewJSONRPCRequest(id, method, args)
+	return SendJSONRPCRequest(*req, url)
+}
+
 // SendJSONRPCRequestAndParseResult sends the request and decodes the response into the reply interface. If the JSON-RPC response
 // contains an Error property, the it's returned as this function's error.
 func SendJSONRPCRequestAndParseResult(req JSONRPCRequest, url string, reply interface{}) (err error) {
