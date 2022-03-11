@@ -9,31 +9,29 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func setupMockServer() (addr string) {
-	rpcBackendServer := httptest.NewServer(http.HandlerFunc(relayBackendHandler))
-	return rpcBackendServer.URL
+type MockJSONRPCServer struct {
+	handlers map[string]func(req *JSONRPCRequest) (interface{}, error)
+	server   *httptest.Server
+	URL      string
 }
 
-func handleRPCRequest(req *JSONRPCRequest) (result interface{}, err error) {
-	switch req.Method {
-	case "eth_call":
-		return "0x12345", nil
-	default:
-		return "", fmt.Errorf("no RPC method handler implemented for %s", req.Method)
+func NewMockJSONRPCServer() *MockJSONRPCServer {
+	s := &MockJSONRPCServer{
+		handlers: make(map[string]func(req *JSONRPCRequest) (interface{}, error)),
 	}
+	s.server = httptest.NewServer(http.HandlerFunc(s.handleHTTPRequest))
+	s.URL = s.server.URL
+	return s
 }
 
-func relayBackendHandler(w http.ResponseWriter, req *http.Request) {
+func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
-
-	log.Info("mock-backend request", "addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
 	w.Header().Set("Content-Type", "application/json")
 	testHeader := req.Header.Get("Test")
 	w.Header().Set("Test", testHeader)
 
 	returnError := func(id interface{}, msg string) {
-		log.Info("returnError", "msg", msg)
 		res := JSONRPCResponse{
 			ID: id,
 			Error: &JSONRPCError{
@@ -43,18 +41,24 @@ func relayBackendHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			log.Error("error writing response 1", "err", err, "data", res)
+			log.Error("error writing response", "err", err, "data", res)
 		}
 	}
 
 	// Parse JSON RPC
 	jsonReq := new(JSONRPCRequest)
 	if err := json.NewDecoder(req.Body).Decode(jsonReq); err != nil {
-		returnError(-1, fmt.Sprintf("failed to parse request body: %v", err))
+		returnError(0, fmt.Sprintf("failed to parse request body: %v", err))
 		return
 	}
 
-	rawRes, err := handleRPCRequest(jsonReq)
+	jsonRPCHandler, found := s.handlers[jsonReq.Method]
+	if !found {
+		returnError(jsonReq.ID, fmt.Sprintf("no RPC method handler implemented for %s", jsonReq.Method))
+		return
+	}
+
+	rawRes, err := jsonRPCHandler(jsonReq)
 	if err != nil {
 		returnError(jsonReq.ID, err.Error())
 		return
