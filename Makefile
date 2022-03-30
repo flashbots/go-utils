@@ -1,5 +1,4 @@
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
-# ECR_URI := 223847889945.dkr.ecr.us-east-2.amazonaws.com/your-project-name
 
 all: clean build
 
