@@ -7,6 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func setupMockServer() string {
+	server := NewMockJSONRPCServer()
+	server.handlers["eth_call"] = func(req *JSONRPCRequest) (interface{}, error) {
+		return "0x12345", nil
+	}
+	return server.URL
+}
+
 func TestSendJsonRpcRequest(t *testing.T) {
 	addr := setupMockServer()
 
