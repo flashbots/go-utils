@@ -6,6 +6,16 @@ import (
 	"fmt"
 )
 
+// As per JSON-RPC 2.0 Specification
+// https://www.jsonrpc.org/specification#error_object
+const (
+	ParseError     = -32700
+	InvalidRequest = -32600
+	MethodNotFound = -32601
+	InvalidParams  = -32602
+	InternalError  = -32603
+)
+
 type JSONRPCResponse struct {
 	ID      interface{}     `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
