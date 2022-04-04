@@ -16,6 +16,13 @@ import (
 
 var ErrStopped = errors.New("already stopped")
 
+type BlockSubscriber interface {
+	IsRunning() bool
+	Subscribe(ctx context.Context) Subscription
+	Start() (err error)
+	Stop()
+}
+
 type BlockSub struct {
 	PollTimeout time.Duration // 10 seconds by default (8,640 requests per day)
 	SubTimeout  time.Duration // 60 seconds by default, after this timeout the subscriber will reconnect
