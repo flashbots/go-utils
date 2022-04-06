@@ -18,7 +18,8 @@ func setupMockServer() string {
 func TestSendJsonRpcRequest(t *testing.T) {
 	addr := setupMockServer()
 
-	req := NewJSONRPCRequest(1, "eth_call", "0xabc")
+	req, err := NewJSONRPCRequest(1, "eth_call", "0xabc")
+	assert.Nil(t, err, err)
 	res, err := SendJSONRPCRequest(*req, addr)
 	assert.Nil(t, err, err)
 
@@ -28,7 +29,8 @@ func TestSendJsonRpcRequest(t *testing.T) {
 	assert.Equal(t, "0x12345", *reply)
 
 	// Test an unknown RPC method
-	req2 := NewJSONRPCRequest(2, "unknown", "foo")
+	req2, err := NewJSONRPCRequest(2, "unknown", "foo")
+	assert.Nil(t, err, err)
 	res2, err := SendJSONRPCRequest(*req2, addr)
 	assert.Nil(t, err, err)
 	assert.NotNil(t, res2.Error)
@@ -37,13 +39,15 @@ func TestSendJsonRpcRequest(t *testing.T) {
 func TestSendJSONRPCRequestAndParseResult(t *testing.T) {
 	addr := setupMockServer()
 
-	req := NewJSONRPCRequest(1, "eth_call", "0xabc")
+	req, err := NewJSONRPCRequest(1, "eth_call", "0xabc")
+	assert.Nil(t, err, err)
 	res := new(string)
-	err := SendJSONRPCRequestAndParseResult(*req, addr, res)
+	err = SendJSONRPCRequestAndParseResult(*req, addr, res)
 	assert.Nil(t, err, err)
 	assert.Equal(t, "0x12345", *res)
 
-	req2 := NewJSONRPCRequest(2, "unknown", "foo")
+	req2, err := NewJSONRPCRequest(2, "unknown", "foo")
+	assert.Nil(t, err, err)
 	res2 := new(string)
 	err = SendJSONRPCRequestAndParseResult(*req2, addr, res2)
 	assert.NotNil(t, err, err)

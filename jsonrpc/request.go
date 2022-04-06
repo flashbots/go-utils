@@ -9,19 +9,23 @@ import (
 )
 
 type JSONRPCRequest struct {
-	ID      interface{}    `json:"id"`
-	Method  string         `json:"method"`
-	Params  [1]interface{} `json:"params"`
-	Version string         `json:"jsonrpc,omitempty"`
+	ID      interface{}     `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+	Version string          `json:"jsonrpc,omitempty"`
 }
 
-func NewJSONRPCRequest(id interface{}, method string, args interface{}) *JSONRPCRequest {
+func NewJSONRPCRequest(id interface{}, method string, args interface{}) (request *JSONRPCRequest, err error) {
+	b, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
 	return &JSONRPCRequest{
 		ID:      id,
 		Method:  method,
-		Params:  [1]interface{}{args},
+		Params:  b,
 		Version: "2.0",
-	}
+	}, nil
 }
 
 // SendJSONRPCRequest sends the request to URL and returns the general JsonRpcResponse, or an error (note: not the JSONRPCError)
@@ -46,7 +50,11 @@ func SendJSONRPCRequest(req JSONRPCRequest, url string) (res *JSONRPCResponse, e
 
 // SendNewJSONRPCRequest constructs a request and sends it to the URL
 func SendNewJSONRPCRequest(id interface{}, method string, args interface{}, url string) (res *JSONRPCResponse, err error) {
-	req := NewJSONRPCRequest(id, method, args)
+	req, err := NewJSONRPCRequest(id, method, args)
+	if err != nil {
+		return nil, err
+	}
+
 	return SendJSONRPCRequest(*req, url)
 }
 
