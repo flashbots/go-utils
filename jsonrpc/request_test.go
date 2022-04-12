@@ -9,7 +9,7 @@ import (
 
 func setupMockServer() string {
 	server := NewMockJSONRPCServer()
-	server.handlers["eth_call"] = func(req *JSONRPCRequest) (interface{}, error) {
+	server.Handlers["eth_call"] = func(req *JSONRPCRequest) (interface{}, error) {
 		return "0x12345", nil
 	}
 	return server.URL
