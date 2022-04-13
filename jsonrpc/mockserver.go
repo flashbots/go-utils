@@ -37,13 +37,10 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 	testHeader := req.Header.Get("Test")
 	w.Header().Set("Test", testHeader)
 
-	returnError := func(id interface{}, msg string) {
+	returnError := func(id interface{}, err error) {
 		res := JSONRPCResponse{
-			ID: id,
-			Error: &JSONRPCError{
-				Code:    -32603,
-				Message: msg,
-			},
+			ID:    id,
+			Error: errorPayload(err),
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
@@ -54,20 +51,20 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 	// Parse JSON RPC
 	jsonReq := new(JSONRPCRequest)
 	if err := json.NewDecoder(req.Body).Decode(jsonReq); err != nil {
-		returnError(0, fmt.Sprintf("failed to parse request body: %v", err))
+		returnError(0, fmt.Errorf("failed to parse request body: %v", err))
 		return
 	}
 
 	jsonRPCHandler, found := s.Handlers[jsonReq.Method]
 	if !found {
-		returnError(jsonReq.ID, fmt.Sprintf("no RPC method handler implemented for %s", jsonReq.Method))
+		returnError(jsonReq.ID, fmt.Errorf("no RPC method handler implemented for %s", jsonReq.Method))
 		return
 	}
 
 	s.RequestCounter[jsonReq.Method]++
 	rawRes, err := jsonRPCHandler(jsonReq)
 	if err != nil {
-		returnError(jsonReq.ID, err.Error())
+		returnError(jsonReq.ID, err)
 		return
 	}
 
