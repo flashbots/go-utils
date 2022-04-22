@@ -43,7 +43,15 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 			defer func() {
 				if err := recover(); err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-					log.Info(fmt.Sprintf("http request panic: %s %s", r.Method, r.URL.EscapedPath()),
+
+					method := ""
+					url := ""
+					if r != nil {
+						method = r.Method
+						url = r.URL.EscapedPath()
+					}
+
+					log.Info(fmt.Sprintf("http request panic: %s %s", method, url),
 						"err", err,
 						"trace", string(debug.Stack()),
 					)
