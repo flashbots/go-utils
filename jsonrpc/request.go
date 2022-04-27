@@ -9,17 +9,17 @@ import (
 )
 
 type JSONRPCRequest struct {
-	ID      interface{}    `json:"id"`
-	Method  string         `json:"method"`
-	Params  [1]interface{} `json:"params"`
-	Version string         `json:"jsonrpc,omitempty"`
+	ID      interface{}   `json:"id"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+	Version string        `json:"jsonrpc,omitempty"`
 }
 
 func NewJSONRPCRequest(id interface{}, method string, args interface{}) *JSONRPCRequest {
 	return &JSONRPCRequest{
 		ID:      id,
 		Method:  method,
-		Params:  [1]interface{}{args},
+		Params:  []interface{}{args},
 		Version: "2.0",
 	}
 }
