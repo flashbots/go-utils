@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
 )
 
 type MockJSONRPCServer struct {
+	mu             sync.Mutex
 	Handlers       map[string]func(req *JSONRPCRequest) (interface{}, error)
 	RequestCounter map[string]int
 	server         *httptest.Server
@@ -61,7 +63,10 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 		return
 	}
 
+	s.mu.Lock()
 	s.RequestCounter[jsonReq.Method]++
+	s.mu.Unlock()
+
 	rawRes, err := jsonRPCHandler(jsonReq)
 	if err != nil {
 		returnError(jsonReq.ID, err)
