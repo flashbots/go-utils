@@ -5,21 +5,21 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
 )
 
 type MockJSONRPCServer struct {
 	Handlers       map[string]func(req *JSONRPCRequest) (interface{}, error)
-	RequestCounter map[string]int
+	RequestCounter sync.Map
 	server         *httptest.Server
 	URL            string
 }
 
 func NewMockJSONRPCServer() *MockJSONRPCServer {
 	s := &MockJSONRPCServer{
-		Handlers:       make(map[string]func(req *JSONRPCRequest) (interface{}, error)),
-		RequestCounter: make(map[string]int),
+		Handlers: make(map[string]func(req *JSONRPCRequest) (interface{}, error)),
 	}
 	s.server = httptest.NewServer(http.HandlerFunc(s.handleHTTPRequest))
 	s.URL = s.server.URL
@@ -61,7 +61,8 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 		return
 	}
 
-	s.RequestCounter[jsonReq.Method]++
+	s.IncrementRequestCounter(jsonReq.Method)
+
 	rawRes, err := jsonRPCHandler(jsonReq)
 	if err != nil {
 		returnError(jsonReq.ID, err)
@@ -80,4 +81,15 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 		log.Error("error writing response 2", "err", err, "data", rawRes)
 		return
 	}
+}
+
+func (s *MockJSONRPCServer) IncrementRequestCounter(method string) {
+	var newCount = 0
+
+	currentCount, ok := s.RequestCounter.Load(method)
+	if ok {
+		newCount = currentCount.(int)
+	}
+	s.RequestCounter.Store(method, newCount+1)
+
 }
