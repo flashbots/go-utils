@@ -11,17 +11,15 @@ import (
 )
 
 type MockJSONRPCServer struct {
-	mu             sync.Mutex
 	Handlers       map[string]func(req *JSONRPCRequest) (interface{}, error)
-	RequestCounter map[string]int
+	RequestCounter sync.Map
 	server         *httptest.Server
 	URL            string
 }
 
 func NewMockJSONRPCServer() *MockJSONRPCServer {
 	s := &MockJSONRPCServer{
-		Handlers:       make(map[string]func(req *JSONRPCRequest) (interface{}, error)),
-		RequestCounter: make(map[string]int),
+		Handlers: make(map[string]func(req *JSONRPCRequest) (interface{}, error)),
 	}
 	s.server = httptest.NewServer(http.HandlerFunc(s.handleHTTPRequest))
 	s.URL = s.server.URL
@@ -63,9 +61,7 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 		return
 	}
 
-	s.mu.Lock()
-	s.RequestCounter[jsonReq.Method]++
-	s.mu.Unlock()
+	s.IncrementRequestCounter(jsonReq.Method)
 
 	rawRes, err := jsonRPCHandler(jsonReq)
 	if err != nil {
@@ -85,4 +81,15 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 		log.Error("error writing response 2", "err", err, "data", rawRes)
 		return
 	}
+}
+
+func (s *MockJSONRPCServer) IncrementRequestCounter(method string) {
+	var newCount = 0
+
+	currentCount, ok := s.RequestCounter.Load(method)
+	if ok {
+		newCount = currentCount.(int)
+	}
+	s.RequestCounter.Store(method, newCount+1)
+
 }
