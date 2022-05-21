@@ -1,4 +1,4 @@
-// Package httplogger implements a middleware that logs the incoming HTTP request & its duration using go-ethereum-log.
+// Package httplogger implements a middleware that logs the incoming HTTP request & its duration using go-ethereum-log or logrus
 package httplogger
 
 import (
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/sirupsen/logrus"
 )
 
 // responseWriter is a minimal wrapper for http.ResponseWriter that allows the
@@ -51,7 +52,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 						url = r.URL.EscapedPath()
 					}
 
-					log.Info(fmt.Sprintf("http request panic: %s %s", method, url),
+					log.Error(fmt.Sprintf("http request panic: %s %s", method, url),
 						"err", err,
 						"trace", string(debug.Stack()),
 					)
@@ -66,6 +67,41 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 				"path", r.URL.EscapedPath(),
 				"duration", time.Since(start).Seconds(),
 			)
+		},
+	)
+}
+
+// LoggingMiddlewareLogrus logs the incoming HTTP request & its duration.
+func LoggingMiddlewareLogrus(logger *logrus.Entry, next http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+
+					method := ""
+					url := ""
+					if r != nil {
+						method = r.Method
+						url = r.URL.EscapedPath()
+					}
+
+					logger.WithFields(logrus.Fields{
+						"err":    err,
+						"trace":  string(debug.Stack()),
+						"method": r.Method,
+					}).Error(fmt.Sprintf("http request panic: %s %s", method, url))
+				}
+			}()
+			start := time.Now()
+			wrapped := wrapResponseWriter(w)
+			next.ServeHTTP(wrapped, r)
+			logger.WithFields(logrus.Fields{
+				"status":   wrapped.status,
+				"method":   r.Method,
+				"path":     r.URL.EscapedPath(),
+				"duration": time.Since(start).Seconds(),
+			}).Info(fmt.Sprintf("http: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status))
 		},
 	)
 }
