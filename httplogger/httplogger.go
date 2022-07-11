@@ -65,7 +65,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 				"status", wrapped.status,
 				"method", r.Method,
 				"path", r.URL.EscapedPath(),
-				"duration", time.Since(start).Seconds(),
+				"duration", fmt.Sprintf("%f", time.Since(start).Seconds()),
 			)
 		},
 	)
@@ -100,7 +100,7 @@ func LoggingMiddlewareLogrus(logger *logrus.Entry, next http.Handler) http.Handl
 				"status":   wrapped.status,
 				"method":   r.Method,
 				"path":     r.URL.EscapedPath(),
-				"duration": time.Since(start).Seconds(),
+				"duration": fmt.Sprintf("%f", time.Since(start).Seconds()),
 			}).Info(fmt.Sprintf("http: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status))
 		},
 	)
