@@ -72,7 +72,7 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 	w.WriteHeader(http.StatusOK)
 	resBytes, err := json.Marshal(rawRes)
 	if err != nil {
-		log.Error("error mashalling rawRes", "err", err, "data", rawRes)
+		log.Error("error marshalling rawRes", "err", err, "data", rawRes)
 		return
 	}
 
