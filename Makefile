@@ -1,7 +1,5 @@
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
 
-all: clean build
-
 v:
 	@echo "Version: ${GIT_VER}"
 
