@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -36,6 +37,7 @@ func main() {
 
 	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(os.Stderr, logFormat)))
 
+	fmt.Println("Webserver running at", listenAddr)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello", HelloHandler)
 	mux.HandleFunc("/error", ErrorHandler)
