@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 // responseWriter is a minimal wrapper for http.ResponseWriter that allows the
@@ -102,6 +103,41 @@ func LoggingMiddlewareLogrus(logger *logrus.Entry, next http.Handler) http.Handl
 				"path":     r.URL.EscapedPath(),
 				"duration": fmt.Sprintf("%f", time.Since(start).Seconds()),
 			}).Info(fmt.Sprintf("http: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status))
+		},
+	)
+}
+
+// LoggingMiddlewareZap logs the incoming HTTP request & its duration.
+func LoggingMiddlewareZap(logger *zap.SugaredLogger, next http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+
+					method := ""
+					url := ""
+					if r != nil {
+						method = r.Method
+						url = r.URL.EscapedPath()
+					}
+
+					logger.With(
+						"err", err,
+						"trace", string(debug.Stack()),
+						"method", r.Method,
+					).Errorf("http request panic: %s %s", method, url)
+				}
+			}()
+			start := time.Now()
+			wrapped := wrapResponseWriter(w)
+			next.ServeHTTP(wrapped, r)
+			logger.With(
+				"status", wrapped.status,
+				"method", r.Method,
+				"path", r.URL.EscapedPath(),
+				"duration", fmt.Sprintf("%f", time.Since(start).Seconds()),
+			).Infof("http: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status)
 		},
 	)
 }
