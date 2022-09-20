@@ -61,6 +61,7 @@ func NewBlockSub(ctx context.Context, ethNodeHTTPURI string, ethNodeWebsocketURI
 		ctx:                 ctx,
 		cancel:              cancel,
 		internalHeaderC:     make(chan *ethtypes.Header),
+		wsConnectingCond:    *sync.NewCond(new(sync.Mutex)),
 	}
 	return sub
 }
