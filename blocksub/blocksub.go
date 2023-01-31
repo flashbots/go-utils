@@ -202,8 +202,8 @@ func (s *BlockSub) _pollNow() error {
 func (s *BlockSub) startWebsocket(retryForever bool) error {
 	if isAlreadyConnecting := s.wsIsConnecting.Swap(true); isAlreadyConnecting {
 		s.wsConnectingCond.L.Lock()
-		defer s.wsConnectingCond.L.Unlock()
 		s.wsConnectingCond.Wait()
+		s.wsConnectingCond.L.Unlock()
 		return nil
 	}
 
