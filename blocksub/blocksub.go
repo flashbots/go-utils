@@ -48,7 +48,7 @@ type BlockSub struct {
 
 	latestWsHeader   *ethtypes.Header
 	wsIsConnecting   atomic.Bool
-	wsConnectingCond sync.Cond
+	wsConnectingCond *sync.Cond
 }
 
 func NewBlockSub(ctx context.Context, ethNodeHTTPURI string, ethNodeWebsocketURI string) *BlockSub {
@@ -61,7 +61,7 @@ func NewBlockSub(ctx context.Context, ethNodeHTTPURI string, ethNodeWebsocketURI
 		ctx:                 ctx,
 		cancel:              cancel,
 		internalHeaderC:     make(chan *ethtypes.Header),
-		wsConnectingCond:    *sync.NewCond(new(sync.Mutex)),
+		wsConnectingCond:    sync.NewCond(new(sync.Mutex)),
 	}
 	return sub
 }
@@ -201,7 +201,9 @@ func (s *BlockSub) _pollNow() error {
 // Also blocks if another instance is currently connecting.
 func (s *BlockSub) startWebsocket(retryForever bool) error {
 	if isAlreadyConnecting := s.wsIsConnecting.Swap(true); isAlreadyConnecting {
+		s.wsConnectingCond.L.Lock()
 		s.wsConnectingCond.Wait()
+		s.wsConnectingCond.L.Unlock()
 		return nil
 	}
 
