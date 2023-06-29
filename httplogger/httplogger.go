@@ -144,7 +144,7 @@ func LoggingMiddlewareZap(logger *zap.Logger, next http.Handler) http.Handler {
 		// Passing request stats both in-message (for the human reader)
 		// as well as inside the structured log (for the machine parser)
 		l.Info(fmt.Sprintf("Handled HTTP request: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status),
-			zap.Duration("duration", time.Since(start)),
+			zap.Int("durationMs", int(time.Since(start).Milliseconds())),
 			zap.Int("status", wrapped.status),
 			zap.String("method", r.Method),
 			zap.String("path", r.URL.EscapedPath()),
