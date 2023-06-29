@@ -19,7 +19,11 @@ func TestIs(t *testing.T) {
 			"Y",
 			"yes",
 		} {
-			assert.True(t, truthy.Is(y), fmt.Sprintf("Value '%s' must render as truthy", y))
+			assert.True(
+				t,
+				truthy.FalseOnError(truthy.Is(y)),
+				fmt.Sprintf("Value '%s' must render as truthy", y),
+			)
 		}
 	}
 	{ // falsy values
@@ -33,7 +37,11 @@ func TestIs(t *testing.T) {
 			"N",
 			"no",
 		} {
-			assert.False(t, truthy.Is(n), fmt.Sprintf("Value '%s' must render as falsy", n))
+			assert.False(
+				t,
+				truthy.TrueOnError(truthy.Is(n)),
+				fmt.Sprintf("Value '%s' must render as falsy", n),
+			)
 		}
 	}
 }

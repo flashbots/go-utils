@@ -13,27 +13,75 @@ import (
 )
 
 // Bool is a convenience wrapper for boolean flag that picks its default value
-// from the environment variable.
-func Bool(name string, defaultValue bool, usage string) *bool {
+// from the environment variable. It returns error if the environment variable's
+// value can not be resolved into definitive `true` or `false`.
+func Bool(name string, defaultValue bool, usage string) (*bool, error) {
+	var err error
 	value := defaultValue
 	env := flagToEnv(name)
 	if raw := os.Getenv(env); raw != "" {
-		value = truthy.Is(raw)
+		if pValue, pErr := truthy.Is(raw); pErr == nil {
+			value = pValue
+		} else {
+			err = fmt.Errorf("invalid boolean value \"%s\" for environment variable %s: %w", raw, env, pErr)
+		}
 	}
-	return flag.Bool(name, value, usage+fmt.Sprintf(" (env \"%s\")", env))
+	return flag.Bool(name, value, usage+fmt.Sprintf(" (env \"%s\")", env)), err
+}
+
+// MustBool handles error (if any) returned by Bool according to the behaviour
+// configured by `flag.CommandLine.ErrorHandling()` by either ignoring it,
+// exiting the process with status code 2, or panicking.
+func MustBool(name string, defaultValue bool, usage string) *bool {
+	res, err := Bool(name, defaultValue, usage)
+	if err != nil {
+		switch flag.CommandLine.ErrorHandling() {
+		case flag.ContinueOnError:
+			// continue
+		case flag.ExitOnError:
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		case flag.PanicOnError:
+			panic(err)
+		}
+	}
+	return res
 }
 
 // Int is a convenience wrapper for integer flag that picks its default value
-// from the environment variable.
-func Int(name string, defaultValue int, usage string) *int {
+// from the environment variable. It returns error if the environment variable's
+// value can not be parsed into integer.
+func Int(name string, defaultValue int, usage string) (*int, error) {
+	var err error
 	value := defaultValue
 	env := flagToEnv(name)
 	if raw := os.Getenv(env); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil {
-			value = parsed
+		if pValue, pErr := strconv.Atoi(raw); pErr == nil {
+			value = pValue
+		} else {
+			err = fmt.Errorf("invalid integer value \"%s\" for environment variable %s: %w", raw, env, pErr)
 		}
 	}
-	return flag.Int(name, value, usage+fmt.Sprintf(" (env \"%s\")", env))
+	return flag.Int(name, value, usage+fmt.Sprintf(" (env \"%s\")", env)), err
+}
+
+// MustInt handles error (if any) returned by Int according to the behaviour
+// configured by `flag.CommandLine.ErrorHandling()` by either ignoring it,
+// exiting the process with status code 2, or panicking.
+func MustInt(name string, defaultValue int, usage string) *int {
+	res, err := Int(name, defaultValue, usage)
+	if err != nil {
+		switch flag.CommandLine.ErrorHandling() {
+		case flag.ContinueOnError:
+			// continue
+		case flag.ExitOnError:
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		case flag.PanicOnError:
+			panic(err)
+		}
+	}
+	return res
 }
 
 // String is a convenience wrapper for string flag that picks its default value

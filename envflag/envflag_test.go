@@ -24,7 +24,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		os.Unsetenv(env)
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -33,7 +33,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		os.Unsetenv(env)
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -42,7 +42,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		t.Setenv(env, "0")
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -51,7 +51,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		t.Setenv(env, "0")
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -60,7 +60,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		t.Setenv(env, "1")
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -69,7 +69,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		t.Setenv(env, "1")
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -79,7 +79,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name + "=false"}
 		os.Unsetenv(env)
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -88,7 +88,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name + "=false"}
 		os.Unsetenv(env)
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -97,7 +97,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name + "=false"}
 		t.Setenv(env, "0")
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -106,7 +106,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name + "=false"}
 		t.Setenv(env, "0")
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -115,7 +115,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name + "=false"}
 		t.Setenv(env, "1")
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -124,7 +124,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name + "=false"}
 		t.Setenv(env, "1")
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.False(t, *f)
@@ -134,7 +134,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name}
 		os.Unsetenv(env)
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -143,7 +143,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name}
 		os.Unsetenv(env)
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -152,7 +152,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name}
 		t.Setenv(env, "0")
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -161,7 +161,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name}
 		t.Setenv(env, "0")
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -170,7 +170,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name}
 		t.Setenv(env, "1")
-		f := envflag.Bool(name, false, "")
+		f := envflag.MustBool(name, false, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -179,7 +179,7 @@ func TestBool(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name}
 		t.Setenv(env, "1")
-		f := envflag.Bool(name, true, "")
+		f := envflag.MustBool(name, true, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.True(t, *f)
@@ -201,7 +201,7 @@ func TestInt(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		os.Unsetenv(env)
-		f := envflag.Int(name, 42, "")
+		f := envflag.MustInt(name, 42, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.Equal(t, 42, *f)
@@ -210,7 +210,7 @@ func TestInt(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test"}
 		t.Setenv(env, "42")
-		f := envflag.Int(name, 0, "")
+		f := envflag.MustInt(name, 0, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.Equal(t, 42, *f)
@@ -219,7 +219,7 @@ func TestInt(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 		os.Args = []string{"envflag.test", "-" + name, "42"}
 		t.Setenv(env, "21")
-		f := envflag.Int(name, 0, "")
+		f := envflag.MustInt(name, 0, "")
 		assert.NotNil(t, f)
 		flag.Parse()
 		assert.Equal(t, 42, *f)

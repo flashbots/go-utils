@@ -1,35 +1,48 @@
 // Package truthy implements helpers to test the truthy-ness of the values.
 package truthy
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
-// nos is the list of well-known representations of `false`.
-//
-// Of course, if the user passes some weird string like `faooooolse` that would
-// render it to be considered unjustifiably truthy. However we just can not deal
-// with every possible corner case. So, let's just keep things simple.
-//
-// If need be after all, we can always extend this list (but maybe implement
-// binary search if it grows too big).
-var nos = [...]string{
-	"",
-	"0",
-	"f",
-	"false",
-	"n",
-	"no",
+var isTruthy = map[string]bool{
+	// truthy
+	"1":    true,
+	"t":    true,
+	"true": true,
+	"y":    true,
+	"yes":  true,
+	// non-truthy
+	"":      false,
+	"0":     false,
+	"f":     false,
+	"false": false,
+	"n":     false,
+	"no":    false,
 }
 
 // Is returns `false` if the argument sounds like "false" (empty string, "0",
 // "f", "false", and so on), and `true` otherwise.
-func Is(val string) bool {
-	val = strings.ToLower(val)
-
-	for _, no := range nos {
-		if val == no {
-			return false
-		}
+func Is(val string) (bool, error) {
+	if res, known := isTruthy[strings.ToLower(val)]; known {
+		return res, nil
 	}
+	return false, fmt.Errorf("can not resolve truthy-ness of \"%s\"", val)
+}
 
-	return true
+// TrueOnError returns true if err is not nil, otherwise it returns res.
+func TrueOnError(res bool, err error) bool {
+	if err != nil {
+		return true
+	}
+	return res
+}
+
+// FalseOnError returns false if err is not nil, otherwise it returns res.
+func FalseOnError(res bool, err error) bool {
+	if err != nil {
+		return false
+	}
+	return res
 }

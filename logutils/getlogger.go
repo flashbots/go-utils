@@ -1,9 +1,6 @@
 package logutils
 
 import (
-	"fmt"
-	"strings"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -30,12 +27,11 @@ func LogLevel(level string) LogConfigOption {
 	}
 }
 
-// GetZapLogger returns a logger created according to `log-level` and
-// `log-dev` command-line switches.
-//
-// Note: this method defines two flags, `log-level` and `log-dev`; redefining
-// them in your main app will cause panic.
-func GetZapLogger(options ...LogConfigOption) *zap.Logger {
+// GetZapLogger returns a logger created according to the provided options. In
+// case if anything goes wrong (for example if the log-level string can not be
+// parsed) it will return a logger (with configuration that is closest possible
+// to the desired one) and an error.
+func GetZapLogger(options ...LogConfigOption) (*zap.Logger, error) {
 	cfg := &loggerConfig{
 		devMode: false,
 		level:   zap.InfoLevel.String(),
@@ -54,36 +50,39 @@ func GetZapLogger(options ...LogConfigOption) *zap.Logger {
 
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	level, levelErr := zap.ParseAtomicLevel(cfg.level)
-	if levelErr != nil {
-		level = zap.NewAtomicLevel()
+	// Test the logger build as per the configuration we have so far
+	// (we want to know if anything is wrong as early as possible)
+	basicLogger, err := config.Build()
+	if err != nil {
+		return zap.L(), err // Return global logger for MustGetZapLogger sake
+	}
+
+	// Parse the log level
+	level, err := zap.ParseAtomicLevel(cfg.level)
+	if err != nil {
+		return basicLogger, err // basicLogger is there already, so let's use it
 	}
 	config.Level = level
 
-	l, buildErr := config.Build()
-	if buildErr != nil {
+	// Build the final config of the logger
+	finalLogger, err := config.Build()
+	if err != nil {
+		return basicLogger, err
+	}
+
+	return finalLogger, nil
+}
+
+// MustGetZapLogger is guaranteed to return a logger with configuration as close
+// as possible to the desired one. Any errors encountered in the process will be
+// logged as warnings with the resulting logger.
+func MustGetZapLogger(options ...LogConfigOption) *zap.Logger {
+	l, err := GetZapLogger(options...)
+	if l == nil {
 		l = zap.L()
 	}
-
-	if levelErr != nil {
-		valid := "'" + strings.Join([]string{
-			zap.DebugLevel.String(),
-			zap.InfoLevel.String(),
-			zap.WarnLevel.String(),
-			zap.ErrorLevel.String(),
-			zap.FatalLevel.String(),
-			zap.PanicLevel.String(),
-		}, "', '") + "'"
-		l.Warn(
-			fmt.Sprintf("Invalid log-level was specified (defaulted to '%s', valid levels are: %s)", config.Level.String(), valid),
-			zap.Error(levelErr),
-		)
+	if err != nil {
+		l.Warn("Error while building the logger", zap.Error(err))
 	}
-	if buildErr != nil {
-		l.Error("Failed to build the logger with desired configuration",
-			zap.Error(buildErr),
-		)
-	}
-
 	return l
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/flashbots/go-utils/envflag"
 	"github.com/flashbots/go-utils/httplogger"
 	"github.com/flashbots/go-utils/logutils"
 	"go.uber.org/zap"
@@ -31,11 +32,11 @@ func PanicHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	logLevel := flag.String("log-level", "info", "Log level")
-	logDev := flag.Bool("log-dev", false, "Log in development mode")
+	logLevel := envflag.String("log-level", "info", "Log level")
+	logDev := envflag.MustBool("log-dev", false, "Log in development mode")
 	flag.Parse()
 
-	l := logutils.GetZapLogger(
+	l := logutils.MustGetZapLogger(
 		logutils.LogDevMode(*logDev),
 		logutils.LogLevel(*logLevel),
 	)
