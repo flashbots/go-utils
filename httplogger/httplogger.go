@@ -117,7 +117,10 @@ func LoggingMiddlewareZap(logger *zap.Logger, next http.Handler) http.Handler {
 		_uuid := [16]byte(uuid.New())
 		httpRequestID := base64.RawStdEncoding.EncodeToString(_uuid[:])
 
-		l := logger.With(zap.String("httpRequestID", httpRequestID))
+		l := logger.With(
+			zap.String("httpRequestID", httpRequestID),
+			zap.String("logType", "activity"),
+		)
 		r = logutils.RequestWithZap(r, l)
 
 		// Handle panics
@@ -143,9 +146,11 @@ func LoggingMiddlewareZap(logger *zap.Logger, next http.Handler) http.Handler {
 
 		// Passing request stats both in-message (for the human reader)
 		// as well as inside the structured log (for the machine parser)
-		l.Info(fmt.Sprintf("Handled HTTP request: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status),
+		logger.Info(fmt.Sprintf("%s: %s %s %d", r.URL.Scheme, r.Method, r.URL.EscapedPath(), wrapped.status),
 			zap.Int("durationMs", int(time.Since(start).Milliseconds())),
 			zap.Int("status", wrapped.status),
+			zap.String("httpRequestID", httpRequestID),
+			zap.String("logType", "access"),
 			zap.String("method", r.Method),
 			zap.String("path", r.URL.EscapedPath()),
 		)
