@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.10.25
+	github.com/google/uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/atomic v1.10.0

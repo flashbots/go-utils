@@ -2,12 +2,15 @@
 package httplogger
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"runtime/debug"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/flashbots/go-utils/logutils"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
@@ -108,36 +111,48 @@ func LoggingMiddlewareLogrus(logger *logrus.Entry, next http.Handler) http.Handl
 }
 
 // LoggingMiddlewareZap logs the incoming HTTP request & its duration.
-func LoggingMiddlewareZap(logger *zap.SugaredLogger, next http.Handler) http.Handler {
-	return http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			defer func() {
-				if err := recover(); err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
+func LoggingMiddlewareZap(logger *zap.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Generate request ID (`base64` to shorten its string representation)
+		_uuid := [16]byte(uuid.New())
+		httpRequestID := base64.RawStdEncoding.EncodeToString(_uuid[:])
 
-					method := ""
-					url := ""
-					if r != nil {
-						method = r.Method
-						url = r.URL.EscapedPath()
-					}
+		l := logger.With(
+			zap.String("httpRequestID", httpRequestID),
+			zap.String("logType", "activity"),
+		)
+		r = logutils.RequestWithZap(r, l)
 
-					logger.With(
-						"err", err,
-						"trace", string(debug.Stack()),
-						"method", r.Method,
-					).Errorf("http request panic: %s %s", method, url)
+		// Handle panics
+		defer func() {
+			if msg := recover(); msg != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				var method, url string
+				if r != nil {
+					method = r.Method
+					url = r.URL.EscapedPath()
 				}
-			}()
-			start := time.Now()
-			wrapped := wrapResponseWriter(w)
-			next.ServeHTTP(wrapped, r)
-			logger.With(
-				"status", wrapped.status,
-				"method", r.Method,
-				"path", r.URL.EscapedPath(),
-				"duration", fmt.Sprintf("%f", time.Since(start).Seconds()),
-			).Infof("http: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status)
-		},
-	)
+				l.Error("HTTP request handler panicked",
+					zap.Any("error", msg),
+					zap.String("method", method),
+					zap.String("url", url),
+				)
+			}
+		}()
+
+		start := time.Now()
+		wrapped := wrapResponseWriter(w)
+		next.ServeHTTP(w, r)
+
+		// Passing request stats both in-message (for the human reader)
+		// as well as inside the structured log (for the machine parser)
+		logger.Info(fmt.Sprintf("%s: %s %s %d", r.URL.Scheme, r.Method, r.URL.EscapedPath(), wrapped.status),
+			zap.Int("durationMs", int(time.Since(start).Milliseconds())),
+			zap.Int("status", wrapped.status),
+			zap.String("httpRequestID", httpRequestID),
+			zap.String("logType", "access"),
+			zap.String("method", r.Method),
+			zap.String("path", r.URL.EscapedPath()),
+		)
+	})
 }
