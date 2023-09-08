@@ -4,11 +4,11 @@ go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.12.2
-	github.com/google/uuid v1.3.0
-	github.com/sirupsen/logrus v1.9.0
-	github.com/stretchr/testify v1.8.1
-	go.uber.org/atomic v1.10.0
-	go.uber.org/zap v1.23.0
+	github.com/google/uuid v1.3.1
+	github.com/sirupsen/logrus v1.9.3
+	github.com/stretchr/testify v1.8.4
+	go.uber.org/atomic v1.11.0
+	go.uber.org/zap v1.25.0
 )
 
 require (
@@ -26,7 +26,7 @@ require (
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.13.0 // indirect
 	golang.org/x/exp v0.0.0-20230810033253-352e893a4cad // indirect
 	golang.org/x/sys v0.12.0 // indirect
