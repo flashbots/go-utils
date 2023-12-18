@@ -45,6 +45,9 @@ func MustBool(name string, defaultValue bool, usage string) *bool {
 			panic(err)
 		}
 	}
+	if res == nil { // should never happen, guard added for NilAway
+		panic(fmt.Sprintf("MustBool res for '%s' is nil", name))
+	}
 	return res
 }
 
@@ -81,6 +84,11 @@ func MustInt(name string, defaultValue int, usage string) *int {
 			panic(err)
 		}
 	}
+
+	if res == nil { // should never happen, guard added for NilAway
+		panic(fmt.Sprintf("MustInt res for '%s' is nil", name))
+	}
+
 	return res
 }
 
