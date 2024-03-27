@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
+
+	"golang.org/x/exp/slog"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/go-utils/blocksub"
@@ -16,17 +19,18 @@ var (
 )
 
 func logSetup() {
-	logLevel := log.LvlInfo
+	logLevel := log.LevelInfo
 	if logDebug {
-		logLevel = log.LvlDebug
+		logLevel = log.LevelDebug
 	}
 
-	logFormat := log.TerminalFormat(true)
+	output := io.Writer(os.Stderr)
+	var handler slog.Handler = log.NewTerminalHandlerWithLevel(output, logLevel, true)
 	if logJSON {
-		logFormat = log.JSONFormat()
+		handler = log.JSONHandler(output)
 	}
 
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, logFormat)))
+	log.SetDefault(log.NewLogger(handler))
 }
 
 func main() {
