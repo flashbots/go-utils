@@ -4,6 +4,7 @@ package httplogger
 import (
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -66,6 +67,41 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 			wrapped := wrapResponseWriter(w)
 			next.ServeHTTP(wrapped, r)
 			log.Info(fmt.Sprintf("http: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status),
+				"status", wrapped.status,
+				"method", r.Method,
+				"path", r.URL.EscapedPath(),
+				"duration", fmt.Sprintf("%f", time.Since(start).Seconds()),
+			)
+		},
+	)
+}
+
+// LoggingMiddlewareSlog logs the incoming HTTP request & its duration.
+func LoggingMiddlewareSlog(logger *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+
+					method := ""
+					url := ""
+					if r != nil {
+						method = r.Method
+						url = r.URL.EscapedPath()
+					}
+
+					logger.Error(fmt.Sprintf("http request panic: %s %s", method, url),
+						"err", err,
+						"trace", string(debug.Stack()),
+						"method", r.Method,
+					)
+				}
+			}()
+			start := time.Now()
+			wrapped := wrapResponseWriter(w)
+			next.ServeHTTP(wrapped, r)
+			logger.Info(fmt.Sprintf("http: %s %s %d", r.Method, r.URL.EscapedPath(), wrapped.status),
 				"status", wrapped.status,
 				"method", r.Method,
 				"path", r.URL.EscapedPath(),
