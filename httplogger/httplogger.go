@@ -106,6 +106,7 @@ func LoggingMiddlewareSlog(logger *slog.Logger, next http.Handler) http.Handler 
 				"method", r.Method,
 				"path", r.URL.EscapedPath(),
 				"duration", fmt.Sprintf("%f", time.Since(start).Seconds()),
+				"durationUs", fmt.Sprint(time.Since(start).Microseconds()),
 			)
 		},
 	)
