@@ -12,7 +12,7 @@ func TestErrorResponse(t *testing.T) {
 		return nil, &JSONRPCError{Code: 123, Message: "test"}
 	}
 
-	req := NewJSONRPCRequest(1, "eth_call", "0xabc")
+	req := NewJSONRPCRequest(1, "eth_call", []interface{}{"0xabc"})
 	res, err := SendJSONRPCRequest(*req, server.URL)
 	assert.Nil(t, err, err)
 	assert.NotNil(t, res.Error)
