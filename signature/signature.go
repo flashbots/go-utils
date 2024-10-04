@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -22,59 +23,59 @@ var (
 
 // Verify takes a X-Flashbots-Signature header and a body and verifies that the signature is valid for the body.
 // It returns the signing address if the signature is valid or an error if the signature is invalid.
-func Verify(header string, body []byte) (signingAddress string, err error) {
+func Verify(header string, body []byte) (common.Address, error) {
 	if header == "" {
-		return "", ErrNoSignature
+		return common.Address{}, ErrNoSignature
 	}
 
-	address, signatureStr, found := strings.Cut(header, ":")
+	parsedSignerStr, parsedSignatureStr, found := strings.Cut(header, ":")
 	if !found {
-		return "", fmt.Errorf("%w: missing separator", ErrInvalidSignature)
+		return common.Address{}, fmt.Errorf("%w: missing separator", ErrInvalidSignature)
 	}
 
-	signature, err := hexutil.Decode(signatureStr)
-	if err != nil || len(signature) == 0 {
-		return "", fmt.Errorf("%w: %w", ErrInvalidSignature, err)
+	parsedSignature, err := hexutil.Decode(parsedSignatureStr)
+	if err != nil || len(parsedSignature) == 0 {
+		return common.Address{}, fmt.Errorf("%w: %w", ErrInvalidSignature, err)
 	}
 
-	if signature[len(signature)-1] >= 27 {
-		signature[len(signature)-1] -= 27
+	if parsedSignature[len(parsedSignature)-1] >= 27 {
+		parsedSignature[len(parsedSignature)-1] -= 27
 	}
-	if signature[len(signature)-1] > 1 {
-		return "", fmt.Errorf("%w: invalid recovery id", ErrInvalidSignature)
+	if parsedSignature[len(parsedSignature)-1] > 1 {
+		return common.Address{}, fmt.Errorf("%w: invalid recovery id", ErrInvalidSignature)
 	}
 
 	hashedBody := crypto.Keccak256Hash(body).Hex()
 	messageHash := accounts.TextHash([]byte(hashedBody))
-	signaturePublicKeyBytes, err := crypto.Ecrecover(messageHash, signature)
+	recoveredPublicKeyBytes, err := crypto.Ecrecover(messageHash, parsedSignature)
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrInvalidSignature, err)
+		return common.Address{}, fmt.Errorf("%w: %w", ErrInvalidSignature, err)
 	}
 
-	publicKey, err := crypto.UnmarshalPubkey(signaturePublicKeyBytes)
+	recoveredPublicKey, err := crypto.UnmarshalPubkey(recoveredPublicKeyBytes)
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrInvalidSignature, err)
+		return common.Address{}, fmt.Errorf("%w: %w", ErrInvalidSignature, err)
 	}
-	signaturePubkey := *publicKey
-	signaturePubKeyAddress := crypto.PubkeyToAddress(signaturePubkey).Hex()
+	recoveredSigner := crypto.PubkeyToAddress(*recoveredPublicKey)
 
 	// case-insensitive equality check
-	if !strings.EqualFold(signaturePubKeyAddress, address) {
-		return "", fmt.Errorf("%w: signing address mismatch", ErrInvalidSignature)
+	parsedSigner := common.HexToAddress(parsedSignerStr)
+	if recoveredSigner.Cmp(parsedSigner) != 0 {
+		return common.Address{}, fmt.Errorf("%w: signing address mismatch", ErrInvalidSignature)
 	}
 
-	signatureNoRecoverID := signature[:len(signature)-1] // remove recovery id
-	if !crypto.VerifySignature(signaturePublicKeyBytes, messageHash, signatureNoRecoverID) {
-		return "", fmt.Errorf("%w: %w", ErrInvalidSignature, err)
+	signatureNoRecoverID := parsedSignature[:len(parsedSignature)-1] // remove recovery id
+	if !crypto.VerifySignature(recoveredPublicKeyBytes, messageHash, signatureNoRecoverID) {
+		return common.Address{}, fmt.Errorf("%w: %w", ErrInvalidSignature, err)
 	}
 
-	return signaturePubKeyAddress, nil
+	return recoveredSigner, nil
 }
 
 // Create takes a body and a private key and returns a X-Flashbots-Signature header value.
 // The header value can be included in a HTTP request to sign the body.
 func Create(body []byte, privateKey *ecdsa.PrivateKey) (header string, err error) {
-	address := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+	signer := crypto.PubkeyToAddress(privateKey.PublicKey)
 	signature, err := crypto.Sign(
 		accounts.TextHash([]byte(hexutil.Encode(crypto.Keccak256(body)))),
 		privateKey,
@@ -82,11 +83,17 @@ func Create(body []byte, privateKey *ecdsa.PrivateKey) (header string, err error
 	if err != nil {
 		return "", err
 	}
-	// add 27 to last byte if its less than 27 to make it compatible with ethereum
+	// To maintain compatibility with the EVM `ecrecover` precompile, the recovery ID in the last
+	// byte is encoded as v = 27/28 instead of 0/1.
+	//
+	// See:
+	//   - Yellow Paper, Appendix E & F. https://ethereum.github.io/yellowpaper/paper.pdf
+	//   - https://www.evm.codes/precompiled (ecrecover is the 1st precompile at 0x01)
+	//
 	if signature[len(signature)-1] < 27 {
 		signature[len(signature)-1] += 27
 	}
 
-	header = fmt.Sprintf("%s:%s", address, hexutil.Encode(signature))
+	header = fmt.Sprintf("%s:%s", signer, hexutil.Encode(signature))
 	return header, nil
 }
