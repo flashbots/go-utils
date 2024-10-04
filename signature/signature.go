@@ -84,7 +84,8 @@ func Create(body []byte, privateKey *ecdsa.PrivateKey) (header string, err error
 		return "", err
 	}
 	// To maintain compatibility with the EVM `ecrecover` precompile, the recovery ID in the last
-	// byte is encoded as v = 27/28 instead of 0/1.
+	// byte is encoded as v = 27/28 instead of 0/1.  This also ensures we generate the same signatures as other
+	// popular libraries like ethers.js, and tooling like `cast wallet sign` and MetaMask.
 	//
 	// See:
 	//   - Yellow Paper, Appendix E & F. https://ethereum.github.io/yellowpaper/paper.pdf
