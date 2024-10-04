@@ -15,11 +15,11 @@ type JSONRPCRequest struct {
 	Version string        `json:"jsonrpc,omitempty"`
 }
 
-func NewJSONRPCRequest(id interface{}, method string, args interface{}) *JSONRPCRequest {
+func NewJSONRPCRequest(id interface{}, method string, args []interface{}) *JSONRPCRequest {
 	return &JSONRPCRequest{
 		ID:      id,
 		Method:  method,
-		Params:  []interface{}{args},
+		Params:  args,
 		Version: "2.0",
 	}
 }
@@ -45,7 +45,7 @@ func SendJSONRPCRequest(req JSONRPCRequest, url string) (res *JSONRPCResponse, e
 }
 
 // SendNewJSONRPCRequest constructs a request and sends it to the URL
-func SendNewJSONRPCRequest(id interface{}, method string, args interface{}, url string) (res *JSONRPCResponse, err error) {
+func SendNewJSONRPCRequest(id interface{}, method string, args []interface{}, url string) (res *JSONRPCResponse, err error) {
 	req := NewJSONRPCRequest(id, method, args)
 	return SendJSONRPCRequest(*req, url)
 }
