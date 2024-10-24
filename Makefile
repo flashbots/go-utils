@@ -6,6 +6,9 @@ v:
 test:
 	go test ./...
 
+bench:
+	go test -bench=. -run=Bench ./...
+
 fmt: 
 	gofmt -s -w .
 	gci write .
