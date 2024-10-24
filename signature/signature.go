@@ -72,13 +72,40 @@ func Verify(header string, body []byte) (common.Address, error) {
 	return recoveredSigner, nil
 }
 
+type Signer struct {
+	privateKey *ecdsa.PrivateKey
+	address    common.Address
+	hexAddress string
+}
+
+func NewSigner(privateKey *ecdsa.PrivateKey) Signer {
+	address := crypto.PubkeyToAddress(privateKey.PublicKey)
+	return Signer{
+		privateKey: privateKey,
+		hexAddress: address.Hex(),
+		address:    address,
+	}
+}
+
+func NewRandomSigner() (*Signer, error) {
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	signer := NewSigner(privateKey)
+	return &signer, nil
+}
+
+func (s *Signer) Address() common.Address {
+	return s.address
+}
+
 // Create takes a body and a private key and returns a X-Flashbots-Signature header value.
 // The header value can be included in a HTTP request to sign the body.
-func Create(body []byte, privateKey *ecdsa.PrivateKey) (header string, err error) {
-	signer := crypto.PubkeyToAddress(privateKey.PublicKey)
+func (s *Signer) Create(body []byte) (string, error) {
 	signature, err := crypto.Sign(
 		accounts.TextHash([]byte(hexutil.Encode(crypto.Keccak256(body)))),
-		privateKey,
+		s.privateKey,
 	)
 	if err != nil {
 		return "", err
@@ -95,6 +122,6 @@ func Create(body []byte, privateKey *ecdsa.PrivateKey) (header string, err error
 		signature[len(signature)-1] += 27
 	}
 
-	header = fmt.Sprintf("%s:%s", signer, hexutil.Encode(signature))
+	header := fmt.Sprintf("%s:%s", s.hexAddress, hexutil.Encode(signature))
 	return header, nil
 }
