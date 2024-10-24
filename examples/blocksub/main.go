@@ -5,10 +5,9 @@ import (
 	"io"
 	"os"
 
-	"golang.org/x/exp/slog"
-
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/go-utils/blocksub"
+	"golang.org/x/exp/slog"
 )
 
 var (

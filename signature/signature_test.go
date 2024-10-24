@@ -8,9 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/require"
-
 	"github.com/flashbots/go-utils/signature"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSignatureVerify tests the signature verification function.

@@ -6,6 +6,12 @@ v:
 test:
 	go test ./...
 
+fmt: 
+	gofmt -s -w .
+	gci write .
+	gofumpt -w -extra .
+	go mod tidy
+
 lint:
 	gofmt -d ./
 	go vet ./...

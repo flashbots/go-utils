@@ -14,7 +14,7 @@ func CheckErr(err error) {
 }
 
 // GetEnv returns the value of the environment variable named by key, or defaultValue if the environment variable doesn't exist
-func GetEnv(key string, defaultValue string) string {
+func GetEnv(key, defaultValue string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
 	}
