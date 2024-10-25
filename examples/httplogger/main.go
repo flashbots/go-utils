@@ -12,9 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	listenAddr = "localhost:8124"
-)
+var listenAddr = "localhost:8124"
 
 func HelloHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello, World!"))

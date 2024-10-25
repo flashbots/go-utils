@@ -84,7 +84,7 @@ func (s *MockJSONRPCServer) handleHTTPRequest(w http.ResponseWriter, req *http.R
 }
 
 func (s *MockJSONRPCServer) IncrementRequestCounter(method string) {
-	var newCount = 0
+	newCount := 0
 	currentCount, ok := s.RequestCounter.Load(method)
 	if ok {
 		newCount = currentCount.(int)

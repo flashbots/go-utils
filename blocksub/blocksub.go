@@ -51,7 +51,7 @@ type BlockSub struct {
 	wsConnectingCond *sync.Cond
 }
 
-func NewBlockSub(ctx context.Context, ethNodeHTTPURI string, ethNodeWebsocketURI string) *BlockSub {
+func NewBlockSub(ctx context.Context, ethNodeHTTPURI, ethNodeWebsocketURI string) *BlockSub {
 	ctx, cancel := context.WithCancel(ctx)
 	sub := &BlockSub{
 		PollTimeout:         10 * time.Second,
@@ -242,7 +242,7 @@ func (s *BlockSub) _startWebsocket() (err error) {
 
 	// Listen for headers and errors, and reconnect if needed
 	go func() {
-		var timer = time.NewTimer(s.SubTimeout)
+		timer := time.NewTimer(s.SubTimeout)
 
 		for {
 			select {

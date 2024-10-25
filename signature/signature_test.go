@@ -8,9 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/require"
-
 	"github.com/flashbots/go-utils/signature"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSignatureVerify tests the signature verification function.
@@ -124,16 +123,16 @@ func TestVerifySignatureFromCast(t *testing.T) {
 // TestSignatureCreateAndVerify uses a randomly generated private key
 // to create a signature and then verifies it.
 func TestSignatureCreateAndVerify(t *testing.T) {
-	privateKey, err := crypto.GenerateKey()
+	signer, err := signature.NewRandomSigner()
 	require.NoError(t, err)
 
-	signerAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+	signerAddress := signer.Address()
 	body := fmt.Sprintf(
 		`{"jsonrpc":"2.0","method":"eth_getTransactionCount","params":["%s","pending"],"id":1}`,
 		signerAddress,
 	)
 
-	header, err := signature.Create([]byte(body), privateKey)
+	header, err := signer.Create([]byte(body))
 	require.NoError(t, err)
 
 	verifiedAddress, err := signature.Verify(header, []byte(body))
@@ -154,7 +153,9 @@ func TestSignatureCreateCompareToCastAndEthers(t *testing.T) {
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	require.NoError(t, err)
 
-	address := crypto.PubkeyToAddress(privateKey.PublicKey)
+	signer := signature.NewSigner(privateKey)
+
+	address := signer.Address()
 	body := []byte("Hello")
 
 	// I generated the signature using the cast CLI:
@@ -177,11 +178,40 @@ func TestSignatureCreateCompareToCastAndEthers(t *testing.T) {
 	expectedHeader := fmt.Sprintf("%s:%s", expectedAddress, expectedSignature)
 	require.Equal(t, expectedAddress, address)
 
-	header, err := signature.Create(body, privateKey)
+	header, err := signer.Create(body)
 	require.NoError(t, err)
 	require.Equal(t, expectedHeader, header)
 
 	verifiedAddress, err := signature.Verify(header, body)
 	require.NoError(t, err)
 	require.Equal(t, expectedAddress, verifiedAddress)
+}
+
+func BenchmarkSignatureCreate(b *testing.B) {
+	signer, err := signature.NewRandomSigner()
+	require.NoError(b, err)
+
+	body := []byte("Hello")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := signer.Create(body)
+		require.NoError(b, err)
+	}
+}
+
+// benchmark signature verification
+func BenchmarkSignatureVerify(b *testing.B) {
+	signer, err := signature.NewRandomSigner()
+	require.NoError(b, err)
+
+	body := "body"
+	header, err := signer.Create([]byte(body))
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := signature.Verify(header, []byte(body))
+		require.NoError(b, err)
+	}
 }
