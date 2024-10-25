@@ -2,7 +2,8 @@
 //
 // Implemenation and  interface is a slightly modified copy of  https://github.com/ybbus/jsonrpc
 // The differences are:
-// * we handles a case when Flashbots API returns errors incorrectly according to jsonrpc protocol (backwards compatibility)
+// * we handle case when Flashbots API returns errors incorrectly according to jsonrpc protocol (backwards compatibility)
+// * we don't support object params in the Call API. When you do Call with one object we set params to be [object] instead of object
 // * we can sign request body with ecdsa
 package rpcclient
 
@@ -14,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"reflect"
 	"strconv"
 
 	"github.com/flashbots/go-utils/signature"
@@ -34,32 +34,34 @@ type RPCClient interface {
 	// Call is used to send a JSON-RPC request to the server endpoint.
 	//
 	// The spec states, that params can only be an array or an object, no primitive values.
-	// So there are a few simple rules to notice:
+	// We don't support object params in call interface and we always wrap params into array.
+	// Use NewRequestWithObjectParam to create a request with object param.
 	//
 	// 1. no params: params field is omitted. e.g. Call(ctx, "getinfo")
 	//
 	// 2. single params primitive value: value is wrapped in array. e.g. Call(ctx, "getByID", 1423)
 	//
-	// 3. single params value array or object: value is unchanged. e.g. Call(ctx, "storePerson", &Person{Name: "Alex"})
+	// 3. single params value array: array value is wrapped into array (use CallRaw to pass array to params without wrapping). e.g. Call(ctx, "storePerson", []*Person{&Person{Name: "Alex"}})
 	//
-	// 4. multiple params values: always wrapped in array. e.g. Call(ctx, "setDetails", "Alex, 35, "Germany", true)
+	// 4. single object or multiple params values: always wrapped in array. e.g. Call(ctx, "setDetails", "Alex, 35, "Germany", true)
 	//
 	// Examples:
 	//   Call(ctx, "getinfo") -> {"method": "getinfo"}
 	//   Call(ctx, "getPersonId", 123) -> {"method": "getPersonId", "params": [123]}
 	//   Call(ctx, "setName", "Alex") -> {"method": "setName", "params": ["Alex"]}
 	//   Call(ctx, "setMale", true) -> {"method": "setMale", "params": [true]}
-	//   Call(ctx, "setNumbers", []int{1, 2, 3}) -> {"method": "setNumbers", "params": [1, 2, 3]}
+	//   Call(ctx, "setNumbers", []int{1, 2, 3}) -> {"method": "setNumbers", "params": [[1, 2, 3]]}
+	//   Call(ctx, "setNumbers", []int{1, 2, 3}...) -> {"method": "setNumbers", "params": [1, 2, 3]}
 	//   Call(ctx, "setNumbers", 1, 2, 3) -> {"method": "setNumbers", "params": [1, 2, 3]}
-	//   Call(ctx, "savePerson", &Person{Name: "Alex", Age: 35}) -> {"method": "savePerson", "params": {"name": "Alex", "age": 35}}
+	//   Call(ctx, "savePerson", &Person{Name: "Alex", Age: 35}) -> {"method": "savePerson", "params": [{"name": "Alex", "age": 35}]}
 	//   Call(ctx, "setPersonDetails", "Alex", 35, "Germany") -> {"method": "setPersonDetails", "params": ["Alex", 35, "Germany"}}
 	//
 	// for more information, see the examples or the unit tests
-	Call(ctx context.Context, method string, params ...interface{}) (*RPCResponse, error)
+	Call(ctx context.Context, method string, params ...any) (*RPCResponse, error)
 
 	// CallRaw is like Call() but without magic in the requests.Params field.
 	// The RPCRequest object is sent exactly as you provide it.
-	// See docs: NewRequest, RPCRequest, Params()
+	// See docs: NewRequest, RPCRequest
 	//
 	// It is recommended to first consider Call() and CallFor()
 	CallRaw(ctx context.Context, request *RPCRequest) (*RPCResponse, error)
@@ -77,7 +79,7 @@ type RPCClient interface {
 	// an error is returned. if it was an JSON-RPC error it can be casted
 	// to *RPCError.
 	//
-	CallFor(ctx context.Context, out interface{}, method string, params ...interface{}) error
+	CallFor(ctx context.Context, out any, method string, params ...any) error
 
 	// CallBatch invokes a list of RPCRequests in a single batch request.
 	//
@@ -111,12 +113,6 @@ type RPCClient interface {
 	//     Method: "myMethod1",
 	//     Params: []int{1},   // there is no magic, be sure to only use array or object
 	//   },
-	//   &RPCRequest{
-	//     ID: 612,
-	//     JSONRPC: "2.0",
-	//     Method: "myMethod2",
-	//     Params: Params("Alex", 35, true), // you can use helper function Params() (see doc)
-	//   },
 	// })
 	//
 	// Returns RPCResponses that is of type []*RPCResponse
@@ -142,34 +138,25 @@ type RPCClient interface {
 // The following functions do that for you:
 // Call(), CallFor(), NewRequest()
 //
-// If you want to create it yourself (e.g. in batch or CallRaw()), consider using Params().
-// Params() is a helper function that uses the same parameter syntax as Call().
-//
-// e.g. to manually create an RPCRequest object:
+// If you want to create it yourself (e.g. in batch or CallRaw())
+// you can potentially create incorrect rpc requests:
 //
 //	request := &RPCRequest{
 //	  Method: "myMethod",
-//	  Params: Params("Alex", 35, true),
-//	}
-//
-// If you know what you are doing you can omit the Params() call to avoid some reflection but potentially create incorrect rpc requests:
-//
-//	request := &RPCRequest{
-//	  Method: "myMethod",
-//	  Params: 2, <-- invalid since a single primitive value must be wrapped in an array --> no magic without Params()
+//	  Params: 2, <-- invalid since a single primitive value must be wrapped in an array
 //	}
 //
 // correct:
 //
 //	request := &RPCRequest{
 //	  Method: "myMethod",
-//	  Params: []int{2}, <-- invalid since a single primitive value must be wrapped in an array
+//	  Params: []int{2},
 //	}
 type RPCRequest struct {
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params,omitempty"`
-	ID      int         `json:"id"`
-	JSONRPC string      `json:"jsonrpc"`
+	Method  string `json:"method"`
+	Params  any    `json:"params,omitempty"`
+	ID      int    `json:"id"`
+	JSONRPC string `json:"jsonrpc"`
 }
 
 // NewRequest returns a new RPCRequest that can be created using the same convenient parameter syntax as Call()
@@ -177,24 +164,30 @@ type RPCRequest struct {
 // Default RPCRequest id is 0. If you want to use an id other than 0, use NewRequestWithID() or set the ID field of the returned RPCRequest manually.
 //
 // e.g. NewRequest("myMethod", "Alex", 35, true)
-func NewRequest(method string, params ...interface{}) *RPCRequest {
-	request := &RPCRequest{
-		Method:  method,
-		Params:  Params(params...),
-		JSONRPC: jsonrpcVersion,
-	}
-
-	return request
+func NewRequest(method string, params ...any) *RPCRequest {
+	return NewRequestWithID(0, method, params...)
 }
 
 // NewRequestWithID returns a new RPCRequest that can be created using the same convenient parameter syntax as Call()
 //
 // e.g. NewRequestWithID(123, "myMethod", "Alex", 35, true)
-func NewRequestWithID(id int, method string, params ...interface{}) *RPCRequest {
+func NewRequestWithID(id int, method string, params ...any) *RPCRequest {
+	// this code will omit "params" from the json output instead of having "params": null
+	var newParams any
+	if params != nil {
+		newParams = params
+	}
+	return NewRequestWithObjectParam(id, method, newParams)
+}
+
+// NewRequestWithObjectParam returns a new RPCRequest that uses param object without wrapping it into array
+//
+// e.g. NewRequestWithID(struct{}{}) -> {"params": {}}
+func NewRequestWithObjectParam(id int, method string, params any) *RPCRequest {
 	request := &RPCRequest{
 		ID:      id,
 		Method:  method,
-		Params:  Params(params...),
+		Params:  params,
 		JSONRPC: jsonrpcVersion,
 	}
 
@@ -213,10 +206,10 @@ func NewRequestWithID(id int, method string, params ...interface{}) *RPCRequest 
 //
 // See: http://www.jsonrpc.org/specification#response_object
 type RPCResponse struct {
-	JSONRPC string      `json:"jsonrpc"`
-	Result  interface{} `json:"result,omitempty"`
-	Error   *RPCError   `json:"error,omitempty"`
-	ID      int         `json:"id"`
+	JSONRPC string    `json:"jsonrpc"`
+	Result  any       `json:"result,omitempty"`
+	Error   *RPCError `json:"error,omitempty"`
+	ID      int       `json:"id"`
 }
 
 // RPCError represents a JSON-RPC error object if an RPC error occurred.
@@ -229,9 +222,9 @@ type RPCResponse struct {
 //
 // See: http://www.jsonrpc.org/specification#error_object
 type RPCError struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    any    `json:"data,omitempty"`
 }
 
 // Error function is provided to be used as error object.
@@ -369,14 +362,8 @@ func NewClientWithOpts(endpoint string, opts *RPCClientOpts) RPCClient {
 	return rpcClient
 }
 
-func (client *rpcClient) Call(ctx context.Context, method string, params ...interface{}) (*RPCResponse, error) {
-	request := &RPCRequest{
-		ID:      client.defaultRequestID,
-		Method:  method,
-		Params:  Params(params...),
-		JSONRPC: jsonrpcVersion,
-	}
-
+func (client *rpcClient) Call(ctx context.Context, method string, params ...any) (*RPCResponse, error) {
+	request := NewRequestWithID(client.defaultRequestID, method, params...)
 	return client.doCall(ctx, request)
 }
 
@@ -384,7 +371,7 @@ func (client *rpcClient) CallRaw(ctx context.Context, request *RPCRequest) (*RPC
 	return client.doCall(ctx, request)
 }
 
-func (client *rpcClient) CallFor(ctx context.Context, out interface{}, method string, params ...interface{}) error {
+func (client *rpcClient) CallFor(ctx context.Context, out any, method string, params ...any) error {
 	rpcResponse, err := client.Call(ctx, method, params...)
 	if err != nil {
 		return err
@@ -418,7 +405,7 @@ func (client *rpcClient) CallBatchRaw(ctx context.Context, requests RPCRequests)
 	return client.doBatchCall(ctx, requests)
 }
 
-func (client *rpcClient) newRequest(ctx context.Context, req interface{}) (*http.Request, error) {
+func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -601,76 +588,6 @@ func (client *rpcClient) doBatchCall(ctx context.Context, rpcRequest []*RPCReque
 	return rpcResponses, nil
 }
 
-// Params is a helper function that uses the same parameter syntax as Call().
-// But you should consider to always use NewRequest() instead.
-//
-// e.g. to manually create an RPCRequest object:
-//
-//	request := &RPCRequest{
-//	  Method: "myMethod",
-//	  Params: Params("Alex", 35, true),
-//	}
-//
-// same with new request:
-// request := NewRequest("myMethod", "Alex", 35, true)
-//
-// If you know what you are doing you can omit the Params() call but potentially create incorrect rpc requests:
-//
-//	request := &RPCRequest{
-//	  Method: "myMethod",
-//	  Params: 2, <-- invalid since a single primitive value must be wrapped in an array --> no magic without Params()
-//	}
-//
-// correct:
-//
-//	request := &RPCRequest{
-//	  Method: "myMethod",
-//	  Params: []int{2}, <-- valid since a single primitive value must be wrapped in an array
-//	}
-func Params(params ...interface{}) interface{} {
-	var finalParams interface{}
-
-	// if params was nil skip this and p stays nil
-	if params != nil {
-		switch len(params) {
-		case 0: // no parameters were provided, do nothing so finalParam is nil and will be omitted
-		case 1: // one param was provided, use it directly as is, or wrap primitive types in array
-			if params[0] != nil {
-				var typeOf reflect.Type
-
-				// traverse until nil or not a pointer type
-				for typeOf = reflect.TypeOf(params[0]); typeOf != nil && typeOf.Kind() == reflect.Ptr; typeOf = typeOf.Elem() {
-				}
-
-				if typeOf != nil {
-					// now check if we can directly marshal the type or if it must be wrapped in an array
-					switch typeOf.Kind() {
-					// for these types we just do nothing, since value of p is already unwrapped from the array params
-					case reflect.Struct:
-						finalParams = params[0]
-					case reflect.Array:
-						finalParams = params[0]
-					case reflect.Slice:
-						finalParams = params[0]
-					case reflect.Interface:
-						finalParams = params[0]
-					case reflect.Map:
-						finalParams = params[0]
-					default: // everything else must stay in an array (int, string, etc)
-						finalParams = params
-					}
-				}
-			} else {
-				finalParams = params
-			}
-		default: // if more than one parameter was provided it should be treated as an array
-			finalParams = params
-		}
-	}
-
-	return finalParams
-}
-
 // GetInt converts the rpc response to an int64 and returns it.
 //
 // If result was not an integer an error is returned.
@@ -732,7 +649,7 @@ func (RPCResponse *RPCResponse) GetString() (string, error) {
 // GetObject converts the rpc response to an arbitrary type.
 //
 // The function works as you would expect it from json.Unmarshal()
-func (RPCResponse *RPCResponse) GetObject(toType interface{}) error {
+func (RPCResponse *RPCResponse) GetObject(toType any) error {
 	js, err := json.Marshal(RPCResponse.Result)
 	if err != nil {
 		return err

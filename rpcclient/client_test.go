@@ -92,19 +92,19 @@ func TestRpcClient_Call(t *testing.T) {
 
 	_, err = rpcClient.Call(context.Background(), "emptyParams", []interface{}{})
 	check.Nil(err)
-	check.Equal(`{"method":"emptyParams","params":[],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"emptyParams","params":[[]],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "emptyAnyParams", []string{})
 	check.Nil(err)
-	check.Equal(`{"method":"emptyAnyParams","params":[],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"emptyAnyParams","params":[[]],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "emptyObject", struct{}{})
 	check.Nil(err)
-	check.Equal(`{"method":"emptyObject","params":{},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"emptyObject","params":[{}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "emptyObjectList", []struct{}{{}, {}})
 	check.Nil(err)
-	check.Equal(`{"method":"emptyObjectList","params":[{},{}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"emptyObjectList","params":[[{},{}]],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "boolParam", true)
 	check.Nil(err)
@@ -144,20 +144,20 @@ func TestRpcClient_Call(t *testing.T) {
 
 	_, err = rpcClient.Call(context.Background(), "emptyMissingPublicFieldObject", struct{ name string }{name: "Alex"})
 	check.Nil(err)
-	check.Equal(`{"method":"emptyMissingPublicFieldObject","params":{},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"emptyMissingPublicFieldObject","params":[{}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "singleStruct", person)
 	check.Nil(err)
-	check.Equal(`{"method":"singleStruct","params":{"name":"Alex","age":35,"country":"Germany"},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"singleStruct","params":[{"name":"Alex","age":35,"country":"Germany"}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "singlePointerToStruct", &person)
 	check.Nil(err)
-	check.Equal(`{"method":"singlePointerToStruct","params":{"name":"Alex","age":35,"country":"Germany"},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"singlePointerToStruct","params":[{"name":"Alex","age":35,"country":"Germany"}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	pp := &person
 	_, err = rpcClient.Call(context.Background(), "doublePointerStruct", &pp)
 	check.Nil(err)
-	check.Equal(`{"method":"doublePointerStruct","params":{"name":"Alex","age":35,"country":"Germany"},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"doublePointerStruct","params":[{"name":"Alex","age":35,"country":"Germany"}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "multipleStructs", person, &drink)
 	check.Nil(err)
@@ -165,35 +165,35 @@ func TestRpcClient_Call(t *testing.T) {
 
 	_, err = rpcClient.Call(context.Background(), "singleStructInArray", []interface{}{person})
 	check.Nil(err)
-	check.Equal(`{"method":"singleStructInArray","params":[{"name":"Alex","age":35,"country":"Germany"}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"singleStructInArray","params":[[{"name":"Alex","age":35,"country":"Germany"}]],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "namedParameters", map[string]interface{}{
 		"name": "Alex",
 		"age":  35,
 	})
 	check.Nil(err)
-	check.Equal(`{"method":"namedParameters","params":{"age":35,"name":"Alex"},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"namedParameters","params":[{"age":35,"name":"Alex"}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "anonymousStructNoTags", struct {
 		Name string
 		Age  int
 	}{"Alex", 33})
 	check.Nil(err)
-	check.Equal(`{"method":"anonymousStructNoTags","params":{"Name":"Alex","Age":33},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"anonymousStructNoTags","params":[{"Name":"Alex","Age":33}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "anonymousStructWithTags", struct {
 		Name string `json:"name"`
 		Age  int    `json:"age"`
 	}{"Alex", 33})
 	check.Nil(err)
-	check.Equal(`{"method":"anonymousStructWithTags","params":{"name":"Alex","age":33},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"anonymousStructWithTags","params":[{"name":"Alex","age":33}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "structWithNullField", struct {
 		Name    string  `json:"name"`
 		Address *string `json:"address"`
 	}{"Alex", nil})
 	check.Nil(err)
-	check.Equal(`{"method":"structWithNullField","params":{"name":"Alex","address":null},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"structWithNullField","params":[{"name":"Alex","address":null}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 
 	_, err = rpcClient.Call(context.Background(), "nestedStruct",
 		Planet{
@@ -205,7 +205,12 @@ func TestRpcClient_Call(t *testing.T) {
 		})
 
 	check.Nil(err)
-	check.Equal(`{"method":"nestedStruct","params":{"name":"Mars","properties":{"distance":54600000,"color":"red"}},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+	check.Equal(`{"method":"nestedStruct","params":[{"name":"Mars","properties":{"distance":54600000,"color":"red"}}],"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
+
+	request := NewRequestWithObjectParam(0, "singleStructRawObjectRequest", person)
+	_, err = rpcClient.CallRaw(context.Background(), request)
+	check.Nil(err)
+	check.Equal(`{"method":"singleStructRawObjectRequest","params":{"name":"Alex","age":35,"country":"Germany"},"id":0,"jsonrpc":"2.0"}`, (<-requestChan).body)
 }
 
 func TestRpcClient_CallBatch(t *testing.T) {
@@ -239,7 +244,7 @@ func TestRpcClient_CallBatch(t *testing.T) {
 	_, err = rpcClient.CallBatch(context.Background(), RPCRequests{
 		{
 			Method: "singleRequest",
-			Params: Params(3), // always valid json rpc
+			Params: []int{3}, // always valid json rpc
 		},
 	})
 	check.Nil(err)
@@ -298,10 +303,10 @@ func TestRpcClient_CallBatch(t *testing.T) {
 
 	check.Equal(`[{"method":"nullParam","params":[null],"id":0,"jsonrpc":"2.0"},`+
 		`{"method":"nullParams","params":[null,null],"id":1,"jsonrpc":"2.0"},`+
-		`{"method":"emptyParams","params":[],"id":2,"jsonrpc":"2.0"},`+
-		`{"method":"emptyAnyParams","params":[],"id":3,"jsonrpc":"2.0"},`+
-		`{"method":"emptyObject","params":{},"id":4,"jsonrpc":"2.0"},`+
-		`{"method":"emptyObjectList","params":[{},{}],"id":5,"jsonrpc":"2.0"},`+
+		`{"method":"emptyParams","params":[[]],"id":2,"jsonrpc":"2.0"},`+
+		`{"method":"emptyAnyParams","params":[[]],"id":3,"jsonrpc":"2.0"},`+
+		`{"method":"emptyObject","params":[{}],"id":4,"jsonrpc":"2.0"},`+
+		`{"method":"emptyObjectList","params":[[{},{}]],"id":5,"jsonrpc":"2.0"},`+
 		`{"method":"boolParam","params":[true],"id":6,"jsonrpc":"2.0"},`+
 		`{"method":"boolParams","params":[true,false,true],"id":7,"jsonrpc":"2.0"},`+
 		`{"method":"stringParam","params":["Alex"],"id":8,"jsonrpc":"2.0"},`+
@@ -311,15 +316,15 @@ func TestRpcClient_CallBatch(t *testing.T) {
 		`{"method":"floatParam","params":[1.23],"id":12,"jsonrpc":"2.0"},`+
 		`{"method":"floatParams","params":[1.23,3.21],"id":13,"jsonrpc":"2.0"},`+
 		`{"method":"manyParams","params":["Alex",35,true,null,2.34],"id":14,"jsonrpc":"2.0"},`+
-		`{"method":"emptyMissingPublicFieldObject","params":{},"id":15,"jsonrpc":"2.0"},`+
-		`{"method":"singleStruct","params":{"name":"Alex","age":35,"country":"Germany"},"id":16,"jsonrpc":"2.0"},`+
-		`{"method":"singlePointerToStruct","params":{"name":"Alex","age":35,"country":"Germany"},"id":17,"jsonrpc":"2.0"},`+
+		`{"method":"emptyMissingPublicFieldObject","params":[{}],"id":15,"jsonrpc":"2.0"},`+
+		`{"method":"singleStruct","params":[{"name":"Alex","age":35,"country":"Germany"}],"id":16,"jsonrpc":"2.0"},`+
+		`{"method":"singlePointerToStruct","params":[{"name":"Alex","age":35,"country":"Germany"}],"id":17,"jsonrpc":"2.0"},`+
 		`{"method":"multipleStructs","params":[{"name":"Alex","age":35,"country":"Germany"},{"name":"Cuba Libre","ingredients":["rum","cola"]}],"id":18,"jsonrpc":"2.0"},`+
-		`{"method":"singleStructInArray","params":[{"name":"Alex","age":35,"country":"Germany"}],"id":19,"jsonrpc":"2.0"},`+
-		`{"method":"namedParameters","params":{"age":35,"name":"Alex"},"id":20,"jsonrpc":"2.0"},`+
-		`{"method":"anonymousStructNoTags","params":{"Name":"Alex","Age":33},"id":21,"jsonrpc":"2.0"},`+
-		`{"method":"anonymousStructWithTags","params":{"name":"Alex","age":33},"id":22,"jsonrpc":"2.0"},`+
-		`{"method":"structWithNullField","params":{"name":"Alex","address":null},"id":23,"jsonrpc":"2.0"}]`, (<-requestChan).body)
+		`{"method":"singleStructInArray","params":[[{"name":"Alex","age":35,"country":"Germany"}]],"id":19,"jsonrpc":"2.0"},`+
+		`{"method":"namedParameters","params":[{"age":35,"name":"Alex"}],"id":20,"jsonrpc":"2.0"},`+
+		`{"method":"anonymousStructNoTags","params":[{"Name":"Alex","Age":33}],"id":21,"jsonrpc":"2.0"},`+
+		`{"method":"anonymousStructWithTags","params":[{"name":"Alex","age":33}],"id":22,"jsonrpc":"2.0"},`+
+		`{"method":"structWithNullField","params":[{"name":"Alex","address":null}],"id":23,"jsonrpc":"2.0"}]`, (<-requestChan).body)
 
 	// create batch manually
 	requests = []*RPCRequest{
@@ -1041,7 +1046,7 @@ func TestCallFlashbots(t *testing.T) {
 	check.Nil(err)
 	check.NotNil(res)
 	check.NotNil(res.Error)
-	check.Equal("unable to parse body as JSON", res.Error.Message)
+	check.Equal("missing block param", res.Error.Message)
 	check.Equal(FlashbotsBrokenErrorResponseCode, res.Error.Code)
 }
 
