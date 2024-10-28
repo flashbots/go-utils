@@ -87,6 +87,22 @@ func NewSigner(privateKey *ecdsa.PrivateKey) Signer {
 	}
 }
 
+// NewSignerFromHexPrivateKey creates new signer from 0x-prefixed hex-encoded private key
+func NewSignerFromHexPrivateKey(hexPrivateKey string) (*Signer, error) {
+	privateKeyBytes, err := hexutil.Decode(hexPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKey, err := crypto.ToECDSA(privateKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	signer := NewSigner(privateKey)
+	return &signer, nil
+}
+
 func NewRandomSigner() (*Signer, error) {
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
