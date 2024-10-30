@@ -76,6 +76,8 @@ type Methods map[string]any
 type JSONRPCHandlerOpts struct {
 	// Logger, can be nil
 	Log *slog.Logger
+	// Server name. Used to separate logs and metrics when having multiple servers in one binary.
+	ServerName string
 	// Max size of the request payload
 	MaxRequestBodySizeBytes int64
 	// If true payload signature from X-Flashbots-Signature will be verified
@@ -121,10 +123,10 @@ func (h *JSONRPCHandler) writeJSONRPCResponse(w http.ResponseWriter, response js
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		if h.Log != nil {
-			h.Log.Error("failed to marshall response", slog.Any("error", err))
+			h.Log.Error("failed to marshall response", slog.Any("error", err), slog.String("serverName", h.ServerName))
 		}
 		http.Error(w, errMarshalResponse, http.StatusInternalServerError)
-		incInternalErrors()
+		incInternalErrors(h.ServerName)
 		return
 	}
 }
@@ -150,19 +152,19 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	defer func() {
-		incRequestCount(methodForMetrics)
-		incRequestDuration(methodForMetrics, time.Since(startAt).Milliseconds())
+		incRequestCount(methodForMetrics, h.ServerName)
+		incRequestDuration(methodForMetrics, time.Since(startAt).Milliseconds(), h.ServerName)
 	}()
 
 	if r.Method != http.MethodPost {
 		http.Error(w, errMethodNotAllowed, http.StatusMethodNotAllowed)
-		incIncorrectRequest()
+		incIncorrectRequest(h.ServerName)
 		return
 	}
 
 	if r.Header.Get("Content-Type") != "application/json" {
 		http.Error(w, errWrongContentType, http.StatusUnsupportedMediaType)
-		incIncorrectRequest()
+		incIncorrectRequest(h.ServerName)
 		return
 	}
 
@@ -171,7 +173,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg := fmt.Sprintf("request body is too big, max size: %d", h.MaxRequestBodySizeBytes)
 		h.writeJSONRPCError(w, nil, CodeInvalidRequest, msg)
-		incIncorrectRequest()
+		incIncorrectRequest(h.ServerName)
 		return
 	}
 
@@ -180,7 +182,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		signer, err := signature.Verify(signatureHeader, body)
 		if err != nil {
 			h.writeJSONRPCError(w, nil, CodeInvalidRequest, err.Error())
-			incIncorrectRequest()
+			incIncorrectRequest(h.ServerName)
 			return
 		}
 		ctx = context.WithValue(ctx, signerKey{}, signer)
@@ -190,13 +192,13 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req jsonRPCRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		h.writeJSONRPCError(w, nil, CodeParseError, err.Error())
-		incIncorrectRequest()
+		incIncorrectRequest(h.ServerName)
 		return
 	}
 
 	if req.JSONRPC != "2.0" {
 		h.writeJSONRPCError(w, req.ID, CodeParseError, "invalid jsonrpc version")
-		incIncorrectRequest()
+		incIncorrectRequest(h.ServerName)
 		return
 	}
 	if req.ID != nil {
@@ -205,7 +207,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
 		default:
 			h.writeJSONRPCError(w, req.ID, CodeParseError, "invalid id type")
-			incIncorrectRequest()
+			incIncorrectRequest(h.ServerName)
 			return
 		}
 	}
@@ -228,7 +230,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if origin != "" {
 			if len(origin) > maxOriginIDLength {
 				h.writeJSONRPCError(w, req.ID, CodeInvalidRequest, "x-flashbots-origin header is too long")
-				incIncorrectRequest()
+				incIncorrectRequest(h.ServerName)
 				return
 			}
 			ctx = context.WithValue(ctx, originKey{}, origin)
@@ -239,7 +241,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	method, ok := h.methods[req.Method]
 	if !ok {
 		h.writeJSONRPCError(w, req.ID, CodeMethodNotFound, "method not found")
-		incIncorrectRequest()
+		incIncorrectRequest(h.ServerName)
 		return
 	}
 	methodForMetrics = req.Method
@@ -248,14 +250,14 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	result, err := method.call(ctx, req.Params)
 	if err != nil {
 		h.writeJSONRPCError(w, req.ID, CodeCustomError, err.Error())
-		incRequestErrorCount(methodForMetrics)
+		incRequestErrorCount(methodForMetrics, h.ServerName)
 		return
 	}
 
 	marshaledResult, err := json.Marshal(result)
 	if err != nil {
 		h.writeJSONRPCError(w, req.ID, CodeInternalError, err.Error())
-		incInternalErrors()
+		incInternalErrors(h.ServerName)
 		return
 	}
 
