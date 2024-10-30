@@ -147,13 +147,8 @@ func TestSignatureCreateCompareToCastAndEthers(t *testing.T) {
 	// This purposefully uses the already highly compromised keypair from the go-ethereum book:
 	// https://goethereumbook.org/transfer-eth/
 	// privateKey = fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19
-	privateKeyBytes, err := hexutil.Decode("0xfad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19")
+	signer, err := signature.NewSignerFromHexPrivateKey("0xfad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19")
 	require.NoError(t, err)
-
-	privateKey, err := crypto.ToECDSA(privateKeyBytes)
-	require.NoError(t, err)
-
-	signer := signature.NewSigner(privateKey)
 
 	address := signer.Address()
 	body := []byte("Hello")
