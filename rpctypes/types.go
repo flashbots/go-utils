@@ -94,8 +94,11 @@ type RefundConfig struct {
 }
 
 type MevBundleMetadata struct {
-	// should be set only if we are receiving from Flashbots or other builders
-	Signer *common.Address `json:"signer,omitempty"`
+	// Signer should be set by infra that verifies user signatures and not user
+	Signer           *common.Address `json:"signer,omitempty"`
+	ReplacementNonce *int            `json:"replacementNonce,omitempty"`
+	// Used for cancelling. When true the only thing we care about is signer,replacement_nonce and RawShareBundle::replacement_uuid
+	Cancelled *bool `json:"cancelled,omitempty"`
 }
 
 type MevSendBundleArgs struct {
