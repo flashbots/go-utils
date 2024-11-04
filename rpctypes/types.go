@@ -118,8 +118,6 @@ type EthSendRawTransactionArgs hexutil.Bytes
 // eth_cancelBundle
 
 type EthCancelBundleArgs struct {
-	// @todo can builder accept camel case?
-	// this type seems incompatible between builder and other infra
 	ReplacementUUID string          `json:"replacementUuid"`
 	SigningAddress  *common.Address `json:"signingAddress"`
 }
