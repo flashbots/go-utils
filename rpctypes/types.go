@@ -223,7 +223,9 @@ func uniqueKeyMevSendBundle(b *MevSendBundleArgs, hash hash.Hash) {
 }
 
 func (b *MevSendBundleArgs) Validate() (common.Hash, error) {
-	if len(b.Body) == 0 {
+	// only cancell call can be without txs
+	// cancell call must have ReplacementUUID set
+	if len(b.Body) == 0 && b.ReplacementUUID == "" {
 		return common.Hash{}, ErrBundleNoTxs
 	}
 	return hashMevSendBundle(0, b)
