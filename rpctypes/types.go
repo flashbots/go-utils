@@ -118,6 +118,18 @@ type MevSendBundleArgs struct {
 
 type EthSendRawTransactionArgs hexutil.Bytes
 
+func (tx EthSendRawTransactionArgs) MarshalText() ([]byte, error) {
+	return hexutil.Bytes(tx).MarshalText()
+}
+
+func (tx *EthSendRawTransactionArgs) UnmarshalJSON(input []byte) error {
+	return (*hexutil.Bytes)(tx).UnmarshalJSON(input)
+}
+
+func (tx *EthSendRawTransactionArgs) UnmarshalText(input []byte) error {
+	return (*hexutil.Bytes)(tx).UnmarshalText(input)
+}
+
 // eth_cancelBundle
 
 type EthCancelBundleArgs struct {
@@ -256,9 +268,9 @@ func hashMevSendBundle(level int, b *MevSendBundleArgs) (common.Hash, error) {
 	return common.BytesToHash(hasher.Sum(nil)), nil
 }
 
-func (b *EthSendRawTransactionArgs) UniqueKey() uuid.UUID {
+func (tx *EthSendRawTransactionArgs) UniqueKey() uuid.UUID {
 	hash := newHash()
-	_, _ = hash.Write(*b)
+	_, _ = hash.Write(*tx)
 	return uuidFromHash(hash)
 }
 

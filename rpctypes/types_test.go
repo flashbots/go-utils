@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -118,4 +119,20 @@ func TestMevSendBundleArgsValidate(t *testing.T) {
 	hash, err := bundle.Validate()
 	require.NoError(t, err)
 	require.Equal(t, "0x3b1994ad123d089f978074cfa197811b644e43b2b44b4c4710614f3a30ee0744", hash.Hex())
+}
+
+func TestEthsendRawTransactionArgsJSON(t *testing.T) {
+	data := hexutil.MustDecode("0x1234")
+
+	rawTransaction := EthSendRawTransactionArgs(data)
+
+	out, err := json.Marshal(rawTransaction)
+	require.NoError(t, err)
+
+	require.Equal(t, `"0x1234"`, string(out))
+
+	var roundtripRawTransaction EthSendRawTransactionArgs
+	err = json.Unmarshal(out, &roundtripRawTransaction)
+	require.NoError(t, err)
+	require.Equal(t, rawTransaction, roundtripRawTransaction)
 }
