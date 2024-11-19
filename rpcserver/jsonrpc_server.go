@@ -22,7 +22,7 @@ import (
 
 var (
 	// this are the only errors that are returned as http errors with http error codes
-	errMethodNotAllowed = "only POST method is allowded"
+	errMethodNotAllowed = "only POST method is allowed"
 	errWrongContentType = "header Content-Type must be application/json"
 	errMarshalResponse  = "failed to marshal response"
 
