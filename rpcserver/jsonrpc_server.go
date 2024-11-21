@@ -92,6 +92,8 @@ type JSONRPCHandlerOpts struct {
 	// If true extract value from x-flashbots-origin header
 	// Result can be extracted from the context using GetOrigin
 	ExtractOriginFromHeader bool
+	// GET response content
+	GetResponseContent []byte
 }
 
 // NewJSONRPCHandler creates JSONRPC http.Handler from the map that maps method names to method functions
@@ -157,6 +159,19 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	if r.Method != http.MethodPost {
+		// Respond with GET response content if it's set
+		if r.Method == http.MethodGet && len(h.GetResponseContent) > 0 {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write(h.GetResponseContent)
+			if err != nil {
+				http.Error(w, errMarshalResponse, http.StatusInternalServerError)
+				incInternalErrors(h.ServerName)
+				return
+			}
+			return
+		}
+
+		// Responsd with "only POST method is allowed"
 		http.Error(w, errMethodNotAllowed, http.StatusMethodNotAllowed)
 		incIncorrectRequest(h.ServerName)
 		return
