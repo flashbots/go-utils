@@ -9,8 +9,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/flashbots/go-utils/signature"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/flashbots/go-utils/signature"
 )
 
 // needed to retrieve requests that arrived at httpServer for further investigation
@@ -1043,11 +1044,12 @@ func TestCallFlashbots(t *testing.T) {
 	})
 
 	res, err := rpcClient.Call(context.Background(), "eth_sendBundle", struct{}{})
-	check.Nil(err)
+	check.NotNil(err)
+	check.Contains(err.Error(), "rpc response error")
 	check.NotNil(res)
 	check.NotNil(res.Error)
 	check.Equal("missing block param", res.Error.Message)
-	check.Equal(FlashbotsBrokenErrorResponseCode, res.Error.Code)
+	check.Equal(-32602, res.Error.Code)
 }
 
 func TestBrokenFlashbotsErrorResponse(t *testing.T) {

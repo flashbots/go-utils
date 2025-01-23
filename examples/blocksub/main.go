@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/go-utils/blocksub"
-	"golang.org/x/exp/slog"
 )
 
 var (
