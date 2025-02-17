@@ -6,7 +6,7 @@ toolchain go1.23.6
 
 require (
 	github.com/VictoriaMetrics/metrics v1.35.1
-	github.com/ethereum/go-ethereum v1.15.0
+	github.com/ethereum/go-ethereum v1.15.2
 	github.com/google/uuid v1.3.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
@@ -34,7 +34,7 @@ require (
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
-	github.com/supranational/blst v0.3.13 // indirect
+	github.com/supranational/blst v0.3.14 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/valyala/fastrand v1.1.0 // indirect
