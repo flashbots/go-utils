@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/sha3"
 )
@@ -39,8 +38,8 @@ var (
 )
 
 type EthSendBundleArgs struct {
-	Txs               []hexutil.Bytes `json:"txs"`         // empty txs for cancellations are not supported
-	BlockNumber       rpc.BlockNumber `json:"blockNumber"` // 0 block number is not supported
+	Txs               []hexutil.Bytes `json:"txs"`
+	BlockNumber       hexutil.Uint64  `json:"blockNumber"`
 	MinTimestamp      *uint64         `json:"minTimestamp,omitempty"`
 	MaxTimestamp      *uint64         `json:"maxTimestamp,omitempty"`
 	RevertingTxHashes []common.Hash   `json:"revertingTxHashes,omitempty"`
@@ -160,9 +159,15 @@ func uuidFromHash(h hash.Hash) uuid.UUID {
 
 func (b *EthSendBundleArgs) UniqueKey() uuid.UUID {
 	hash := newHash()
-	_ = binary.Write(hash, binary.LittleEndian, b.BlockNumber.Int64())
+	_ = binary.Write(hash, binary.LittleEndian, b.BlockNumber)
 	for _, tx := range b.Txs {
 		_, _ = hash.Write(tx)
+	}
+	if b.MinTimestamp != nil {
+		_ = binary.Write(hash, binary.LittleEndian, b.MinTimestamp)
+	}
+	if b.MaxTimestamp != nil {
+		_ = binary.Write(hash, binary.LittleEndian, b.MaxTimestamp)
 	}
 	sort.Slice(b.RevertingTxHashes, func(i, j int) bool {
 		return bytes.Compare(b.RevertingTxHashes[i][:], b.RevertingTxHashes[j][:]) <= 0
@@ -170,14 +175,20 @@ func (b *EthSendBundleArgs) UniqueKey() uuid.UUID {
 	for _, txHash := range b.RevertingTxHashes {
 		_, _ = hash.Write(txHash.Bytes())
 	}
-	_, _ = hash.Write(b.SigningAddress.Bytes())
+	if b.ReplacementUUID != nil {
+		_, _ = hash.Write([]byte(*b.ReplacementUUID))
+	}
+	if b.ReplacementNonce != nil {
+		_ = binary.Write(hash, binary.LittleEndian, *b.ReplacementNonce)
+	}
+
+	if b.SigningAddress != nil {
+		_, _ = hash.Write(b.SigningAddress.Bytes())
+	}
 	return uuidFromHash(hash)
 }
 
 func (b *EthSendBundleArgs) Validate() (common.Hash, uuid.UUID, error) {
-	if len(b.Txs) == 0 {
-		return common.Hash{}, uuid.Nil, ErrBundleNoTxs
-	}
 	if len(b.Txs) > BundleTxLimit {
 		return common.Hash{}, uuid.Nil, ErrBundleTooManyTxs
 	}
@@ -194,7 +205,7 @@ func (b *EthSendBundleArgs) Validate() (common.Hash, uuid.UUID, error) {
 
 	// then compute the uuid
 	var buf []byte
-	buf = binary.AppendVarint(buf, b.BlockNumber.Int64())
+	buf = binary.AppendVarint(buf, int64(b.BlockNumber))
 	buf = append(buf, hashBytes...)
 	sort.Slice(b.RevertingTxHashes, func(i, j int) bool {
 		return bytes.Compare(b.RevertingTxHashes[i][:], b.RevertingTxHashes[j][:]) <= 0
