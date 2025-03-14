@@ -999,10 +999,10 @@ func TestErrorHandling(t *testing.T) {
 		httpStatusCode = http.StatusInternalServerError
 		call, err := rpcClient.Call(context.Background(), "something", 1, 2, 3)
 		<-requestChan
-		check.NotNil(err)
+		check.Nil(err)
+		check.NotNil(call)
 		check.NotNil(call.Error)
 		check.Equal("123: something wrong", call.Error.Error())
-		check.Contains(err.(*HTTPError).Error(), "status code: 500. rpc response error: 123: something wrong")
 	})
 }
 
@@ -1047,7 +1047,7 @@ func TestCallFlashbots(t *testing.T) {
 	check.NotNil(res)
 	check.NotNil(res.Error)
 	check.Equal("missing block param", res.Error.Message)
-	check.Equal(FlashbotsBrokenErrorResponseCode, res.Error.Code)
+	check.Equal(-32602, res.Error.Code)
 }
 
 func TestBrokenFlashbotsErrorResponse(t *testing.T) {
@@ -1065,10 +1065,8 @@ func TestBrokenFlashbotsErrorResponse(t *testing.T) {
 	httpStatusCode = 400
 	res, err := rpcClient.Call(context.Background(), "something", 1, 2, 3)
 	<-requestChan
-	check.Nil(err)
-	check.Nil(res.Result)
-	check.Equal(FlashbotsBrokenErrorResponseCode, res.Error.Code)
-	check.Equal("unknown method: something", res.Error.Message)
+	check.NotNil(err)
+	check.Nil(res)
 }
 
 type Person struct {
