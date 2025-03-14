@@ -22,9 +22,6 @@ import (
 
 const (
 	jsonrpcVersion = "2.0"
-	// This error code is set in the error reponse when interacting with Flashbots RPC that has broken error response
-	// see docs for RPCClientOpts.RejectBrokenFlashbotsErrors
-	FlashbotsBrokenErrorResponseCode = -32088
 )
 
 // RPCClient sends JSON-RPC requests over HTTP to the provided JSON-RPC backend.
@@ -466,35 +463,12 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	}
 
 	var (
-		rpcResponse                *RPCResponse
-		brokenErrorResponseHandled bool
+		rpcResponse *RPCResponse
 	)
 	err = decodeJSONBody(&rpcResponse)
 
-	// try parse broken Flashbots error
-	if err != nil && !client.rejectBrokenFlashbotsErrors {
-		var brokenErrorResponse *brokenFlashbostErrorResponse
-		// if we have error here we just ingore it and the code below will work with the original error
-		newErr := decodeJSONBody(&brokenErrorResponse)
-		if newErr == nil {
-			rpcResponse = &RPCResponse{
-				JSONRPC: jsonrpcVersion,
-				Result:  nil,
-				Error: &RPCError{
-					Code:    FlashbotsBrokenErrorResponseCode,
-					Message: brokenErrorResponse.Error,
-					Data:    nil,
-				},
-				ID: RPCRequest.ID,
-			}
-			brokenErrorResponseHandled = true
-			err = nil
-		}
-	}
-
 	// parsing error
 	if err != nil {
-
 		// if we have some http error, return it
 		if httpResponse.StatusCode >= 400 {
 			return nil, &HTTPError{
@@ -515,20 +489,6 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 			}
 		}
 		return nil, fmt.Errorf("rpc call %v() on %v status code: %v. rpc response missing", RPCRequest.Method, httpRequest.URL.Redacted(), httpResponse.StatusCode)
-	}
-
-	// if we have a response body, but also a http error situation, return both
-	if !brokenErrorResponseHandled && httpResponse.StatusCode >= 400 {
-		if rpcResponse.Error != nil {
-			return rpcResponse, &HTTPError{
-				Code: httpResponse.StatusCode,
-				err:  fmt.Errorf("rpc call %v() on %v status code: %v. rpc response error: %v", RPCRequest.Method, httpRequest.URL.Redacted(), httpResponse.StatusCode, rpcResponse.Error),
-			}
-		}
-		return rpcResponse, &HTTPError{
-			Code: httpResponse.StatusCode,
-			err:  fmt.Errorf("rpc call %v() on %v status code: %v. no rpc error available", RPCRequest.Method, httpRequest.URL.Redacted(), httpResponse.StatusCode),
-		}
 	}
 
 	return rpcResponse, nil
@@ -661,8 +621,4 @@ func (RPCResponse *RPCResponse) GetObject(toType any) error {
 	}
 
 	return nil
-}
-
-type brokenFlashbostErrorResponse struct {
-	Error string `json:"error,omitempty"`
 }
