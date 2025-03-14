@@ -39,7 +39,7 @@ var (
 
 type EthSendBundleArgs struct {
 	Txs               []hexutil.Bytes `json:"txs"`
-	BlockNumber       hexutil.Uint64  `json:"blockNumber"`
+	BlockNumber       *hexutil.Uint64 `json:"blockNumber"`
 	MinTimestamp      *uint64         `json:"minTimestamp,omitempty"`
 	MaxTimestamp      *uint64         `json:"maxTimestamp,omitempty"`
 	RevertingTxHashes []common.Hash   `json:"revertingTxHashes,omitempty"`
@@ -158,8 +158,12 @@ func uuidFromHash(h hash.Hash) uuid.UUID {
 }
 
 func (b *EthSendBundleArgs) UniqueKey() uuid.UUID {
+	blockNumber := uint64(0)
+	if b.BlockNumber != nil {
+		blockNumber = uint64(*b.BlockNumber)
+	}
 	hash := newHash()
-	_ = binary.Write(hash, binary.LittleEndian, b.BlockNumber)
+	_ = binary.Write(hash, binary.LittleEndian, blockNumber)
 	for _, tx := range b.Txs {
 		_, _ = hash.Write(tx)
 	}
@@ -189,6 +193,10 @@ func (b *EthSendBundleArgs) UniqueKey() uuid.UUID {
 }
 
 func (b *EthSendBundleArgs) Validate() (common.Hash, uuid.UUID, error) {
+	blockNumber := uint64(0)
+	if b.BlockNumber != nil {
+		blockNumber = uint64(*b.BlockNumber)
+	}
 	if len(b.Txs) > BundleTxLimit {
 		return common.Hash{}, uuid.Nil, ErrBundleTooManyTxs
 	}
@@ -205,7 +213,7 @@ func (b *EthSendBundleArgs) Validate() (common.Hash, uuid.UUID, error) {
 
 	// then compute the uuid
 	var buf []byte
-	buf = binary.AppendVarint(buf, int64(b.BlockNumber))
+	buf = binary.AppendVarint(buf, int64(blockNumber))
 	buf = append(buf, hashBytes...)
 	sort.Slice(b.RevertingTxHashes, func(i, j int) bool {
 		return bytes.Compare(b.RevertingTxHashes[i][:], b.RevertingTxHashes[j][:]) <= 0
