@@ -1,15 +1,15 @@
 module github.com/flashbots/go-utils
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.23.6
+toolchain go1.24.0
 
 require (
 	github.com/VictoriaMetrics/metrics v1.35.1
-	github.com/ethereum/go-ethereum v1.15.2
+	github.com/ethereum/go-ethereum v1.15.5
 	github.com/google/uuid v1.3.1
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.25.0
 	golang.org/x/crypto v0.32.0
