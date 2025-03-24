@@ -19,6 +19,7 @@ func main() {
 			ServerName:         "public_server",
 			GetResponseContent: []byte("Hello world"),
 		},
+		nil,
 	)
 	if err != nil {
 		panic(err)

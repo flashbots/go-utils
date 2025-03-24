@@ -13,7 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testHandler(opts JSONRPCHandlerOpts) *JSONRPCHandler {
+func testHandler(
+	handlerOpts JSONRPCHandlerOpts,
+	methodOpts map[string]MethodOpts,
+) *JSONRPCHandler {
 	var (
 		errorArg = -1
 		errorOut = errors.New("custom error") //nolint:goerr113
@@ -25,9 +28,9 @@ func testHandler(opts JSONRPCHandlerOpts) *JSONRPCHandler {
 		return dummyStruct{arg1}, nil
 	}
 
-	handler, err := NewJSONRPCHandler(map[string]interface{}{
+	handler, err := NewJSONRPCHandler(map[string]any{
 		"function": handlerMethod,
-	}, opts)
+	}, handlerOpts, methodOpts)
 	if err != nil {
 		panic(err)
 	}
@@ -35,7 +38,7 @@ func testHandler(opts JSONRPCHandlerOpts) *JSONRPCHandler {
 }
 
 func TestHandler_ServeHTTP(t *testing.T) {
-	handler := testHandler(JSONRPCHandlerOpts{})
+	handler := testHandler(JSONRPCHandlerOpts{}, nil)
 
 	testCases := map[string]struct {
 		requestBody      string
@@ -85,7 +88,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 }
 
 func TestJSONRPCServerWithClient(t *testing.T) {
-	handler := testHandler(JSONRPCHandlerOpts{})
+	handler := testHandler(JSONRPCHandlerOpts{}, nil)
 	httpServer := httptest.NewServer(handler)
 	defer httpServer.Close()
 
@@ -98,7 +101,13 @@ func TestJSONRPCServerWithClient(t *testing.T) {
 }
 
 func TestJSONRPCServerWithSignatureWithClient(t *testing.T) {
-	handler := testHandler(JSONRPCHandlerOpts{VerifyRequestSignatureFromHeader: true})
+	methodName := "function"
+	methodConfig := MethodOpts{
+		VerifyRequestSignatureFromHeader: true,
+	}
+	handler := testHandler(JSONRPCHandlerOpts{}, map[string]MethodOpts{
+		methodName: methodConfig,
+	})
 	httpServer := httptest.NewServer(handler)
 	defer httpServer.Close()
 

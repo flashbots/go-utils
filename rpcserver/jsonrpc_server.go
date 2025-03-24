@@ -66,20 +66,12 @@ type jsonRPCError struct {
 	Data    *any   `json:"data,omitempty"`
 }
 
-type JSONRPCHandler struct {
-	JSONRPCHandlerOpts
-	methods map[string]methodHandler
+type methodConfig struct {
+	methodHandler
+	opts MethodOpts
 }
 
-type Methods map[string]any
-
-type JSONRPCHandlerOpts struct {
-	// Logger, can be nil
-	Log *slog.Logger
-	// Server name. Used to separate logs and metrics when having multiple servers in one binary.
-	ServerName string
-	// Max size of the request payload
-	MaxRequestBodySizeBytes int64
+type MethodOpts struct {
 	// If true payload signature from X-Flashbots-Signature will be verified
 	// Result can be extracted from the context using GetSigner
 	VerifyRequestSignatureFromHeader bool
@@ -92,6 +84,22 @@ type JSONRPCHandlerOpts struct {
 	// If true extract value from x-flashbots-origin header
 	// Result can be extracted from the context using GetOrigin
 	ExtractOriginFromHeader bool
+}
+
+type JSONRPCHandler struct {
+	JSONRPCHandlerOpts
+	methods map[string]methodConfig
+}
+
+type Methods map[string]any
+
+type JSONRPCHandlerOpts struct {
+	// Logger, can be nil
+	Log *slog.Logger
+	// Server name. Used to separate logs and metrics when having multiple servers in one binary.
+	ServerName string
+	// Max size of the request payload
+	MaxRequestBodySizeBytes int64
 	// GET response content
 	GetResponseContent []byte
 }
@@ -102,21 +110,28 @@ type JSONRPCHandlerOpts struct {
 // - return error as a last argument
 // - have argument types that can be unmarshalled from JSON
 // - have return types that can be marshalled to JSON
-func NewJSONRPCHandler(methods Methods, opts JSONRPCHandlerOpts) (*JSONRPCHandler, error) {
-	if opts.MaxRequestBodySizeBytes == 0 {
-		opts.MaxRequestBodySizeBytes = int64(DefaultMaxRequestBodySizeBytes)
+func NewJSONRPCHandler(
+	methods map[string]any,
+	handlerOpts JSONRPCHandlerOpts,
+	methodOpts map[string]MethodOpts,
+) (*JSONRPCHandler, error) {
+	if handlerOpts.MaxRequestBodySizeBytes == 0 {
+		handlerOpts.MaxRequestBodySizeBytes = int64(DefaultMaxRequestBodySizeBytes)
 	}
 
-	m := make(map[string]methodHandler)
+	m := make(map[string]methodConfig)
 	for name, fn := range methods {
 		method, err := getMethodTypes(fn)
 		if err != nil {
 			return nil, err
 		}
-		m[name] = method
+		m[name] = methodConfig{
+			methodHandler: method,
+			opts:          methodOpts[name],
+		}
 	}
 	return &JSONRPCHandler{
-		JSONRPCHandlerOpts: opts,
+		JSONRPCHandlerOpts: handlerOpts,
 		methods:            m,
 	}, nil
 }
@@ -192,23 +207,28 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.VerifyRequestSignatureFromHeader {
+	var req jsonRPCRequest
+	if jsonErr := json.Unmarshal(body, &req); jsonErr != nil {
+		h.writeJSONRPCError(w, nil, CodeParseError, jsonErr.Error())
+		incIncorrectRequest(h.ServerName)
+		return
+	}
+
+	methodConfig, exists := h.methods[req.Method]
+	if !exists {
+		h.writeJSONRPCError(w, req.ID, CodeMethodNotFound, "method not found")
+		return
+	}
+
+	if methodConfig.opts.VerifyRequestSignatureFromHeader {
 		signatureHeader := r.Header.Get("x-flashbots-signature")
-		signer, err := signature.Verify(signatureHeader, body)
-		if err != nil {
-			h.writeJSONRPCError(w, nil, CodeInvalidRequest, err.Error())
+		signer, verifyErr := signature.Verify(signatureHeader, body)
+		if verifyErr != nil {
+			h.writeJSONRPCError(w, nil, CodeInvalidRequest, verifyErr.Error())
 			incIncorrectRequest(h.ServerName)
 			return
 		}
 		ctx = context.WithValue(ctx, signerKey{}, signer)
-	}
-
-	// read request
-	var req jsonRPCRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		h.writeJSONRPCError(w, nil, CodeParseError, err.Error())
-		incIncorrectRequest(h.ServerName)
-		return
 	}
 
 	if req.JSONRPC != "2.0" {
@@ -227,12 +247,12 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if h.ExtractPriorityFromHeader {
+	if methodConfig.opts.ExtractPriorityFromHeader {
 		highPriority := r.Header.Get("high_prio") == "true"
 		ctx = context.WithValue(ctx, highPriorityKey{}, highPriority)
 	}
 
-	if h.ExtractUnverifiedRequestSignatureFromHeader {
+	if methodConfig.opts.ExtractUnverifiedRequestSignatureFromHeader {
 		signature := r.Header.Get("x-flashbots-signature")
 		if split := strings.Split(signature, ":"); len(split) > 0 {
 			signer := common.HexToAddress(split[0])
@@ -240,7 +260,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if h.ExtractOriginFromHeader {
+	if methodConfig.opts.ExtractOriginFromHeader {
 		origin := r.Header.Get("x-flashbots-origin")
 		if origin != "" {
 			if len(origin) > maxOriginIDLength {
