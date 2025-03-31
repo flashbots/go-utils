@@ -87,6 +87,38 @@ func TestEthSendBundleArgsValidate(t *testing.T) {
 			ExpectedUUID:      "35718fe4-5d24-51c8-93bf-9c961d7c3ea3",
 			ExpectedUniqueKey: "3c718cb9-3f6c-5dc0-9d99-264dafc0b4e9",
 		},
+		{
+			Payload: []byte(`  {
+            "version": "v2",
+            "txs": [
+                "0x02f86b83aa36a780800982520894f24a01ae29dec4629dfb4170647c4ed4efc392cd861ca62a4c95b880c080a07d37bb5a4da153a6fbe24cf1f346ef35748003d1d0fc59cf6c17fb22d49e42cea02c231ac233220b494b1ad501c440c8b1a34535cdb8ca633992d6f35b14428672"
+            ],
+            "blockNumber": "0x0",
+            "minTimestamp": 123,
+            "maxTimestamp": 1234,
+            "revertingTxHashes": ["0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],
+            "droppingTxHashes": ["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+            "refundPercent": 1,
+            "refundRecipient": "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
+            "refundTxHashes": ["0x75662ab9cb6d1be7334723db5587435616352c7e581a52867959ac24006ac1fe"]
+        }`),
+			ExpectedHash:      "0xee3996920364173b0990f92cf6fbeb8a4ab832fe5549c1b728ac44aee0160f02",
+			ExpectedUUID:      "e2bdb8cd-9473-5a1b-b425-57fa7ecfe2c1",
+			ExpectedUniqueKey: "a54c1e8f-936f-5868-bded-f5138c60b34a",
+		},
+		{
+			Payload: []byte(`{
+            "version": "v2",
+            "txs": [
+                "0x02f86b83aa36a780800982520894f24a01ae29dec4629dfb4170647c4ed4efc392cd861ca62a4c95b880c080a07d37bb5a4da153a6fbe24cf1f346ef35748003d1d0fc59cf6c17fb22d49e42cea02c231ac233220b494b1ad501c440c8b1a34535cdb8ca633992d6f35b14428672"
+            ],
+            "blockNumber": "0x0",
+            "revertingTxHashes": []
+        }`),
+			ExpectedHash:      "0xee3996920364173b0990f92cf6fbeb8a4ab832fe5549c1b728ac44aee0160f02",
+			ExpectedUUID:      "22dc6bf0-9a12-5a76-9bbd-98ab77423415",
+			ExpectedUniqueKey: "f61a2d65-d430-5369-9bff-0c44b5abc5a7",
+		},
 	}
 
 	for i, input := range inputs {
