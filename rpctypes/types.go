@@ -7,8 +7,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"hash"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -302,32 +302,54 @@ func (b *EthSendBundleArgs) Validate() (common.Hash, uuid.UUID, error) {
 		//   #refundTxHashes (varint)
 		//   each refundTxHash (32 bytes)
 		// NOTE: The Rust code uses a single byte for `refund.percent`,
-		//       so we do the same here. Adjust as needed if your data differs.
-		if b.RefundPercent != nil && b.RefundRecipient != nil && len(b.RefundTxHashes) > 0 {
+		//       so we do the same here
+		if b.RefundPercent != nil && *b.RefundPercent != 0 {
+			if len(b.Txs) == 0 {
+				// Bundle with not txs can't be refund-recipient
+				return common.Hash{}, uuid.Nil, ErrBundleNoTxs
+			}
+
 			// We only keep the low 8 bits of RefundPercent (mimicking Rust's `buff.push(u8)`).
 			buf = append(buf, byte(*b.RefundPercent))
 
+			refundRecipient := b.RefundRecipient
+			if refundRecipient == nil {
+				var tx types.Transaction
+				if err := tx.UnmarshalBinary(b.Txs[0]); err != nil {
+					return common.Hash{}, uuid.Nil, err
+				}
+				from, err := types.Sender(types.LatestSignerForChainID(big.NewInt(1)), &tx)
+				if err != nil {
+					return common.Hash{}, uuid.Nil, err
+				}
+				refundRecipient = &from
+			}
+			bts := [20]byte(*refundRecipient)
 			// RefundRecipient is a common.Address, which is 20 bytes in geth.
-			buf = append(buf, b.RefundRecipient[:]...)
+			buf = append(buf, bts[:]...)
 
-			// Sort the refund tx hashes if needed. If these are strings with hex “0x...”,
-			// decode to []byte first. For example:
-			sort.Strings(b.RefundTxHashes)
-
-			// #refundTxHashes
-			buf = binary.AppendUvarint(buf, uint64(len(b.RefundTxHashes)))
-
-			// Each refundTxHash, appended as 32 raw bytes
+			var refundTxHashes []common.Hash
 			for _, rth := range b.RefundTxHashes {
 				// decode from hex
-				decoded, err := hexutil.Decode(rth)
-				if err != nil {
-					return common.Hash{}, uuid.Nil, fmt.Errorf("invalid refundTxHash '%s': %w", rth, err)
+				refundTxHashes = append(refundTxHashes, common.HexToHash(rth))
+			}
+
+			if len(refundTxHashes) == 0 {
+				var lastTx types.Transaction
+				if err := lastTx.UnmarshalBinary(b.Txs[len(b.Txs)-1]); err != nil {
+					return common.Hash{}, uuid.Nil, err
 				}
-				if len(decoded) != 32 {
-					return common.Hash{}, uuid.Nil, fmt.Errorf("refundTxHash '%s' must be 32 bytes", rth)
-				}
-				buf = append(buf, decoded...)
+				refundTxHashes = []common.Hash{lastTx.Hash()}
+			}
+
+			// #refundTxHashes
+			buf = binary.AppendUvarint(buf, uint64(len(refundTxHashes)))
+
+			sort.Slice(refundTxHashes, func(i, j int) bool {
+				return bytes.Compare(refundTxHashes[i][:], refundTxHashes[j][:]) < 0
+			})
+			for _, h := range refundTxHashes {
+				buf = append(buf, h[:]...)
 			}
 		}
 
