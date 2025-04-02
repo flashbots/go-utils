@@ -15,6 +15,10 @@ import (
 )
 
 var ErrStopped = errors.New("already stopped")
+var (
+	defaultPollTimeout = 10 * time.Second
+	defaultSubTimeout  = 60 * time.Second
+)
 
 type BlockSubscriber interface {
 	IsRunning() bool
@@ -52,10 +56,14 @@ type BlockSub struct {
 }
 
 func NewBlockSub(ctx context.Context, ethNodeHTTPURI, ethNodeWebsocketURI string) *BlockSub {
+	return NewBlockSubWithTimeout(ctx, ethNodeHTTPURI, ethNodeWebsocketURI, defaultPollTimeout, defaultSubTimeout)
+}
+
+func NewBlockSubWithTimeout(ctx context.Context, ethNodeHTTPURI, ethNodeWebsocketURI string, pollTimeout, subTimeout time.Duration) *BlockSub {
 	ctx, cancel := context.WithCancel(ctx)
 	sub := &BlockSub{
-		PollTimeout:         10 * time.Second,
-		SubTimeout:          60 * time.Second,
+		PollTimeout:         pollTimeout,
+		SubTimeout:          subTimeout,
 		ethNodeHTTPURI:      ethNodeHTTPURI,
 		ethNodeWebsocketURI: ethNodeWebsocketURI,
 		ctx:                 ctx,
