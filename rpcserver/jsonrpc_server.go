@@ -155,8 +155,10 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		incRequestCount(methodForMetrics, h.ServerName)
-		incRequestDuration(methodForMetrics, time.Since(startAt).Milliseconds(), h.ServerName)
+		incRequestDuration(time.Since(startAt), methodForMetrics, h.ServerName)
 	}()
+
+	stepStartAt := time.Now()
 
 	if r.Method != http.MethodPost {
 		// Respond with GET response content if it's set
@@ -191,6 +193,15 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		incIncorrectRequest(h.ServerName)
 		return
 	}
+	defer func(size int) {
+		incRequestSizeBytes(size, methodForMetrics, h.ServerName)
+	}(len(body))
+
+	stepTime := time.Since(stepStartAt)
+	defer func(stepTime time.Duration) {
+		incRequestDurationStep(stepTime, methodForMetrics, h.ServerName, "io")
+	}(stepTime)
+	stepStartAt = time.Now()
 
 	if h.VerifyRequestSignatureFromHeader {
 		signatureHeader := r.Header.Get("x-flashbots-signature")
@@ -261,18 +272,27 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	methodForMetrics = req.Method
 
+	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "parse")
+	stepStartAt = time.Now()
+
 	// call method
 	result, err := method.call(ctx, req.Params)
 	if err != nil {
 		h.writeJSONRPCError(w, req.ID, CodeCustomError, err.Error())
 		incRequestErrorCount(methodForMetrics, h.ServerName)
+		incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "call")
 		return
 	}
+
+	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "call")
+	stepStartAt = time.Now()
 
 	marshaledResult, err := json.Marshal(result)
 	if err != nil {
 		h.writeJSONRPCError(w, req.ID, CodeInternalError, err.Error())
 		incInternalErrors(h.ServerName)
+
+		incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "response")
 		return
 	}
 
@@ -285,6 +305,8 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Error:   nil,
 	}
 	h.writeJSONRPCResponse(w, res)
+
+	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "response")
 }
 
 func GetHighPriority(ctx context.Context) bool {

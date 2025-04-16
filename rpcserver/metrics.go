@@ -2,6 +2,7 @@ package rpcserver
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/VictoriaMetrics/metrics"
 )
@@ -23,6 +24,11 @@ const (
 	errorCountLabel = `goutils_rpcserver_error_count{method="%s",server_name="%s"}`
 	// total duration of the request
 	requestDurationLabel = `goutils_rpcserver_request_duration_milliseconds{method="%s",server_name="%s"}`
+	// partial duration of the request
+	requestDurationStepLabel = `goutils_rpcserver_request_step_duration_milliseconds{method="%s",server_name="%s",step="%s"}`
+
+	// request size in bytes
+	requestSizeBytes = `goutils_rpcserver_request_size_bytes{method="%s",server_name="%s"}`
 )
 
 func incRequestCount(method, serverName string) {
@@ -40,12 +46,24 @@ func incRequestErrorCount(method, serverName string) {
 	metrics.GetOrCreateCounter(l).Inc()
 }
 
-func incRequestDuration(method string, duration int64, serverName string) {
+func incRequestDuration(duration time.Duration, method string, serverName string) {
+	millis := float64(duration.Microseconds()) / 1000.0
 	l := fmt.Sprintf(requestDurationLabel, method, serverName)
-	metrics.GetOrCreateSummary(l).Update(float64(duration))
+	metrics.GetOrCreateSummary(l).Update(millis)
 }
 
 func incInternalErrors(serverName string) {
 	l := fmt.Sprintf(internalErrorsCounter, serverName)
 	metrics.GetOrCreateCounter(l).Inc()
+}
+
+func incRequestDurationStep(duration time.Duration, method, serverName, step string) {
+	millis := float64(duration.Microseconds()) / 1000.0
+	l := fmt.Sprintf(requestDurationStepLabel, method, serverName, step)
+	metrics.GetOrCreateSummary(l).Update(millis)
+}
+
+func incRequestSizeBytes(size int, method string, serverName string) {
+	l := fmt.Sprintf(requestSizeBytes, method, serverName)
+	metrics.GetOrCreateSummary(l).Update(float64(size))
 }
