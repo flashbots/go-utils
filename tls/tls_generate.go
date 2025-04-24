@@ -11,8 +11,46 @@ import (
 	"encoding/pem"
 	"math/big"
 	"net"
+	"os"
 	"time"
 )
+
+// GetOrGenerateTLS tries to load a TLS certificate and key from the given paths, and if that fails,
+// it generates a new self-signed certificate and key and saves it.
+func GetOrGenerateTLS(certPath, certKeyPath string, validFor time.Duration, hosts []string) (cert, key []byte, err error) {
+	// Check if the certificate and key files exist
+	_, err1 := os.Stat(certPath)
+	_, err2 := os.Stat(certKeyPath)
+	if os.IsNotExist(err1) || os.IsNotExist(err2) {
+		// If either file does not exist, generate a new certificate and key
+		cert, key, err = GenerateTLS(validFor, hosts)
+		if err != nil {
+			return nil, nil, err
+		}
+		// Save the generated certificate and key to the specified paths
+		err = os.WriteFile(certPath, cert, 0644)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = os.WriteFile(certKeyPath, key, 0644)
+		if err != nil {
+			return nil, nil, err
+		}
+		return cert, key, nil
+	}
+
+	// The files exist, read them
+	cert, err = os.ReadFile(certPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	key, err = os.ReadFile(certKeyPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, key, nil
+}
 
 // GenerateTLS generated a TLS certificate and key.
 // based on https://go.dev/src/crypto/tls/generate_cert.go
