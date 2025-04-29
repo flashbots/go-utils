@@ -32,7 +32,7 @@ func GetOrGenerateTLS(certPath, certKeyPath string, validFor time.Duration, host
 		if err != nil {
 			return nil, nil, err
 		}
-		err = os.WriteFile(certKeyPath, key, 0644)
+		err = os.WriteFile(certKeyPath, key, 0600)
 		if err != nil {
 			return nil, nil, err
 		}
