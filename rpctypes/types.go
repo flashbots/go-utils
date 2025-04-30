@@ -50,18 +50,16 @@ type EthSendBundleArgs struct {
 	ReplacementUUID   *string         `json:"replacementUuid,omitempty"`
 	Version           *string         `json:"version,omitempty"`
 
-	// fields available only when receiving from the Flashbots or other builders, not users
 	ReplacementNonce *uint64         `json:"replacementNonce,omitempty"`
-	SigningAddress   *common.Address `json:"signingAddress,omitempty"`
+	SigningAddress   *common.Address `json:"signingAddress,omitempty"` // may or may not be respected depending on the context
+	RefundIdentity   *common.Address `json:"refundIdentity,omitempty"` // metadata field to improve redistribution ux
 
-	DroppingTxHashes []common.Hash   `json:"droppingTxHashes,omitempty"` // not supported (from beaverbuild)
-	UUID             *string         `json:"uuid,omitempty"`             // not supported (from beaverbuild)
-	RefundPercent    *uint64         `json:"refundPercent,omitempty"`    // not supported (from beaverbuild)
-	RefundRecipient  *common.Address `json:"refundRecipient,omitempty"`  // not supported (from beaverbuild)
-	RefundTxHashes   []string        `json:"refundTxHashes,omitempty"`   // not supported (from titanbuilder)
+	DroppingTxHashes []common.Hash   `json:"droppingTxHashes,omitempty"`
+	UUID             *string         `json:"uuid,omitempty"`
+	RefundPercent    *uint64         `json:"refundPercent,omitempty"`
+	RefundRecipient  *common.Address `json:"refundRecipient,omitempty"`
+	RefundTxHashes   []string        `json:"refundTxHashes,omitempty"`
 }
-
-// mev_sendBundle
 
 const (
 	RevertModeAllow = "allow"
