@@ -37,7 +37,8 @@ var (
 )
 
 const (
-	maxOriginIDLength = 255
+	maxOriginIDLength    = 255
+	requestSizeThreshold = 50_000
 )
 
 type (
@@ -150,12 +151,12 @@ func (h *JSONRPCHandler) writeJSONRPCError(w http.ResponseWriter, id any, code i
 func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startAt := time.Now()
 	methodForMetrics := unknownMethodLabel
-
+	bigRequest := false
 	ctx := r.Context()
 
 	defer func() {
-		incRequestCount(methodForMetrics, h.ServerName)
-		incRequestDuration(time.Since(startAt), methodForMetrics, h.ServerName)
+		incRequestCount(methodForMetrics, h.ServerName, bigRequest)
+		incRequestDuration(time.Since(startAt), methodForMetrics, h.ServerName, bigRequest)
 	}()
 
 	stepStartAt := time.Now()
@@ -193,13 +194,15 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		incIncorrectRequest(h.ServerName)
 		return
 	}
+	bodySize := len(body)
+	bigRequest = bodySize > requestSizeThreshold
 	defer func(size int) {
 		incRequestSizeBytes(size, methodForMetrics, h.ServerName)
-	}(len(body))
+	}(bodySize)
 
 	stepTime := time.Since(stepStartAt)
 	defer func(stepTime time.Duration) {
-		incRequestDurationStep(stepTime, methodForMetrics, h.ServerName, "io")
+		incRequestDurationStep(stepTime, methodForMetrics, h.ServerName, "io", bigRequest)
 	}(stepTime)
 	stepStartAt = time.Now()
 
@@ -272,7 +275,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	methodForMetrics = req.Method
 
-	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "parse")
+	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "parse", bigRequest)
 	stepStartAt = time.Now()
 
 	// call method
@@ -280,11 +283,11 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.writeJSONRPCError(w, req.ID, CodeCustomError, err.Error())
 		incRequestErrorCount(methodForMetrics, h.ServerName)
-		incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "call")
+		incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "call", bigRequest)
 		return
 	}
 
-	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "call")
+	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "call", bigRequest)
 	stepStartAt = time.Now()
 
 	marshaledResult, err := json.Marshal(result)
@@ -292,7 +295,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.writeJSONRPCError(w, req.ID, CodeInternalError, err.Error())
 		incInternalErrors(h.ServerName)
 
-		incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "response")
+		incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "response", bigRequest)
 		return
 	}
 
@@ -306,7 +309,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	h.writeJSONRPCResponse(w, res)
 
-	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "response")
+	incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "response", bigRequest)
 }
 
 func GetHighPriority(ctx context.Context) bool {
