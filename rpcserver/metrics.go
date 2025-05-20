@@ -19,20 +19,20 @@ const (
 	internalErrorsCounter = `goutils_rpcserver_internal_errors_total{server_name="%s"}`
 
 	// incremented when request comes in
-	requestCountLabel = `goutils_rpcserver_request_count{method="%s",server_name="%s"}`
+	requestCountLabel = `goutils_rpcserver_request_count{method="%s",server_name="%s",is_big="%t"}`
 	// incremented when handler method returns JSONRPC error
 	errorCountLabel = `goutils_rpcserver_error_count{method="%s",server_name="%s"}`
 	// total duration of the request
-	requestDurationLabel = `goutils_rpcserver_request_duration_milliseconds{method="%s",server_name="%s"}`
+	requestDurationLabel = `goutils_rpcserver_request_duration_milliseconds{method="%s",server_name="%s",is_big="%t"}`
 	// partial duration of the request
-	requestDurationStepLabel = `goutils_rpcserver_request_step_duration_milliseconds{method="%s",server_name="%s",step="%s"}`
+	requestDurationStepLabel = `goutils_rpcserver_request_step_duration_milliseconds{method="%s",server_name="%s",step="%s",is_big="%t"}`
 
 	// request size in bytes
 	requestSizeBytes = `goutils_rpcserver_request_size_bytes{method="%s",server_name="%s"}`
 )
 
-func incRequestCount(method, serverName string) {
-	l := fmt.Sprintf(requestCountLabel, method, serverName)
+func incRequestCount(method, serverName string, isBig bool) {
+	l := fmt.Sprintf(requestCountLabel, method, serverName, isBig)
 	metrics.GetOrCreateCounter(l).Inc()
 }
 
@@ -46,9 +46,9 @@ func incRequestErrorCount(method, serverName string) {
 	metrics.GetOrCreateCounter(l).Inc()
 }
 
-func incRequestDuration(duration time.Duration, method string, serverName string) {
+func incRequestDuration(duration time.Duration, method string, serverName string, isBig bool) {
 	millis := float64(duration.Microseconds()) / 1000.0
-	l := fmt.Sprintf(requestDurationLabel, method, serverName)
+	l := fmt.Sprintf(requestDurationLabel, method, serverName, isBig)
 	metrics.GetOrCreateSummary(l).Update(millis)
 }
 
@@ -57,9 +57,9 @@ func incInternalErrors(serverName string) {
 	metrics.GetOrCreateCounter(l).Inc()
 }
 
-func incRequestDurationStep(duration time.Duration, method, serverName, step string) {
+func incRequestDurationStep(duration time.Duration, method, serverName, step string, isBig bool) {
 	millis := float64(duration.Microseconds()) / 1000.0
-	l := fmt.Sprintf(requestDurationStepLabel, method, serverName, step)
+	l := fmt.Sprintf(requestDurationStepLabel, method, serverName, step, isBig)
 	metrics.GetOrCreateSummary(l).Update(millis)
 }
 
