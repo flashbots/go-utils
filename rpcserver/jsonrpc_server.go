@@ -45,6 +45,7 @@ type (
 	highPriorityKey struct{}
 	signerKey       struct{}
 	originKey       struct{}
+	sizeKey         struct{}
 )
 
 type jsonRPCRequest struct {
@@ -195,6 +196,8 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	bodySize := len(body)
+	ctx = context.WithValue(ctx, sizeKey{}, bodySize)
+
 	bigRequest = bodySize > requestSizeThreshold
 	defer func(size int) {
 		incRequestSizeBytes(size, methodForMetrics, h.ServerName)
@@ -334,4 +337,8 @@ func GetOrigin(ctx context.Context) string {
 		return ""
 	}
 	return value
+}
+
+func GetRequestSize(ctx context.Context) int {
+	return ctx.Value(sizeKey{}).(int)
 }
