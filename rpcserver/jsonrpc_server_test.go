@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -119,4 +120,64 @@ func TestJSONRPCServerWithSignatureWithClient(t *testing.T) {
 	err = client.CallFor(context.Background(), &structResp, "function", 123)
 	require.NoError(t, err)
 	require.Equal(t, 123, structResp.Field)
+}
+
+func TestJSONRPCServerDefaultLiveAndReady(t *testing.T) {
+	handler := testHandler(JSONRPCHandlerOpts{})
+	httpServer := httptest.NewServer(handler)
+	defer httpServer.Close()
+
+	// /livez (200 by default)
+	request, err := http.NewRequest(http.MethodGet, "/livez", nil)
+	require.NoError(t, err)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, request)
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.Equal(t, "", rr.Body.String())
+
+	// /readyz (404 by default)
+	request, err = http.NewRequest(http.MethodGet, "/readyz", nil)
+	require.NoError(t, err)
+	rr = httptest.NewRecorder()
+	handler.ServeHTTP(rr, request)
+	require.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestJSONRPCServerReadyzOK(t *testing.T) {
+	handler := testHandler(JSONRPCHandlerOpts{
+		ReadyHandler: func(w http.ResponseWriter, r *http.Request) error {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte("ready"))
+			return err
+		},
+	})
+	httpServer := httptest.NewServer(handler)
+	defer httpServer.Close()
+
+	request, err := http.NewRequest(http.MethodGet, "/readyz", nil)
+	require.NoError(t, err)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, request)
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.Equal(t, "ready", rr.Body.String())
+}
+
+func TestJSONRPCServerReadyzError(t *testing.T) {
+	handler := testHandler(JSONRPCHandlerOpts{
+		ReadyHandler: func(w http.ResponseWriter, r *http.Request) error {
+			return fmt.Errorf("not ready")
+		},
+	})
+	httpServer := httptest.NewServer(handler)
+	defer httpServer.Close()
+
+	request, err := http.NewRequest(http.MethodGet, "/readyz", nil)
+	require.NoError(t, err)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, request)
+	require.Equal(t, http.StatusInternalServerError, rr.Code)
+	fmt.Println(rr.Body.String())
+	require.Equal(t, "not ready\n", rr.Body.String())
 }

@@ -170,17 +170,22 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/livez" {
 			w.WriteHeader(http.StatusOK)
 			return
-		} else if r.URL.Path == "/readyz" && h.JSONRPCHandlerOpts.ReadyHandler != nil {
-			err := h.JSONRPCHandlerOpts.ReadyHandler(w, r)
-			if err == nil {
-				// Response was already written by the handler
+		} else if r.URL.Path == "/readyz" {
+			if h.JSONRPCHandlerOpts.ReadyHandler == nil {
+				http.Error(w, "ready handler is not set", http.StatusNotFound)
+				incIncorrectRequest(h.ServerName)
 				return
 			} else {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				incInternalErrors(h.ServerName)
+				// Handler is expected to write the Response
+				err := h.JSONRPCHandlerOpts.ReadyHandler(w, r)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					incInternalErrors(h.ServerName)
+				}
 				return
 			}
 		} else if len(h.GetResponseContent) > 0 {
+			// Static response for all other GET requests
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write(h.GetResponseContent)
 			if err != nil {
@@ -194,7 +199,6 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// From here we only accept POST requests with JSON body
 	if r.Method != http.MethodPost {
-		// Responsd with "only POST method is allowed"
 		http.Error(w, errMethodNotAllowed, http.StatusMethodNotAllowed)
 		incIncorrectRequest(h.ServerName)
 		return
