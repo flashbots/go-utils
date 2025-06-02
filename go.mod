@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/VictoriaMetrics/metrics v1.35.1
 	github.com/ethereum/go-ethereum v1.15.5
+	github.com/goccy/go-json v0.10.5
 	github.com/google/uuid v1.3.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0

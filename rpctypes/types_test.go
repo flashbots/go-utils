@@ -1,9 +1,10 @@
 package rpctypes
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/goccy/go-json"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"

@@ -51,7 +51,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		},
 		"invalid json": {
 			requestBody:      `{"jsonrpc":"2.0","id":1,"method":"function","params":[1]`,
-			expectedResponse: `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"unexpected end of JSON input"}}`,
+			expectedResponse: `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"expected comma after object element"}}`,
 		},
 		"method not found": {
 			requestBody:      `{"jsonrpc":"2.0","id":1,"method":"not_found","params":[1]}`,
@@ -63,7 +63,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		},
 		"invalid params type": {
 			requestBody:      `{"jsonrpc":"2.0","id":1,"method":"function","params":["1"]}`,
-			expectedResponse: `{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"json: cannot unmarshal string into Go value of type int"}}`,
+			expectedResponse: `{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"json: cannot unmarshal number \" into Go value of type int"}}`,
 		},
 	}
 

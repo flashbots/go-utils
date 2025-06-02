@@ -2,9 +2,10 @@ package rpcserver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"reflect"
+
+	"github.com/goccy/go-json"
 )
 
 var (

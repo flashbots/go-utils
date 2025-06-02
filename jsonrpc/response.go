@@ -2,8 +2,9 @@
 package jsonrpc
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/goccy/go-json"
 )
 
 // As per JSON-RPC 2.0 Specification
