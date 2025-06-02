@@ -28,9 +28,10 @@ type BlockSubscriber interface {
 }
 
 type BlockSub struct {
-	PollTimeout time.Duration // 10 seconds by default (8,640 requests per day)
-	SubTimeout  time.Duration // 60 seconds by default, after this timeout the subscriber will reconnect
-	DebugOutput bool
+	PollTimeout   time.Duration // 10 seconds by default (8,640 requests per day)
+	SubTimeout    time.Duration // 60 seconds by default, after this timeout the subscriber will reconnect
+	DebugOutput   bool
+	EnableMetrics bool
 
 	ethNodeHTTPURI      string // usually port 8545
 	ethNodeWebsocketURI string // usually port 8546
@@ -149,6 +150,10 @@ func (s *BlockSub) runListener() {
 		case header := <-s.internalHeaderC:
 			// use the new header if it's later or has a different hash than the previous known one
 			if header.Number.Uint64() >= s.CurrentBlockNumber && header.Hash().Hex() != s.CurrentBlockHash {
+
+				if s.EnableMetrics {
+					setBlockNumber(header.Number.Uint64())
+				}
 				s.CurrentHeader = header
 				s.CurrentBlockNumber = header.Number.Uint64()
 				s.CurrentBlockHash = header.Hash().Hex()
