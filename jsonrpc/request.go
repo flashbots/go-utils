@@ -3,9 +3,10 @@ package jsonrpc
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/goccy/go-json"
 )
 
 type JSONRPCRequest struct {

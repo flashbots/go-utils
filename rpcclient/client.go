@@ -10,12 +10,13 @@ package rpcclient
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+
+	"github.com/goccy/go-json"
 
 	"github.com/flashbots/go-utils/signature"
 )

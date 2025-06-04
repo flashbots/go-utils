@@ -8,13 +8,14 @@ package rpcserver
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/flashbots/go-utils/signature"
