@@ -56,17 +56,21 @@ type jsonRPCRequest struct {
 	Params  []json.RawMessage `json:"params"`
 }
 
-type jsonRPCResponse struct {
+type JSONRPCResponse struct {
 	JSONRPC string           `json:"jsonrpc"`
 	ID      any              `json:"id"`
 	Result  *json.RawMessage `json:"result,omitempty"`
-	Error   *jsonRPCError    `json:"error,omitempty"`
+	Error   *JSONRPCError    `json:"error,omitempty"`
 }
 
-type jsonRPCError struct {
+type JSONRPCError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    *any   `json:"data,omitempty"`
+}
+
+func (e *JSONRPCError) Error() string {
+	return e.Message
 }
 
 type JSONRPCHandler struct {
@@ -127,7 +131,7 @@ func NewJSONRPCHandler(methods Methods, opts JSONRPCHandlerOpts) (*JSONRPCHandle
 	}, nil
 }
 
-func (h *JSONRPCHandler) writeJSONRPCResponse(w http.ResponseWriter, response jsonRPCResponse) {
+func (h *JSONRPCHandler) writeJSONRPCResponse(w http.ResponseWriter, response JSONRPCResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		if h.Log != nil {
@@ -140,11 +144,11 @@ func (h *JSONRPCHandler) writeJSONRPCResponse(w http.ResponseWriter, response js
 }
 
 func (h *JSONRPCHandler) writeJSONRPCError(w http.ResponseWriter, id any, code int, msg string) {
-	res := jsonRPCResponse{
+	res := JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      id,
 		Result:  nil,
-		Error: &jsonRPCError{
+		Error: &JSONRPCError{
 			Code:    code,
 			Message: msg,
 			Data:    nil,
@@ -308,7 +312,11 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// call method
 	result, err := method.call(ctx, req.Params)
 	if err != nil {
-		h.writeJSONRPCError(w, req.ID, CodeCustomError, err.Error())
+		if jsonRPCErr, ok := err.(*JSONRPCError); ok {
+			h.writeJSONRPCError(w, req.ID, jsonRPCErr.Code, jsonRPCErr.Message)
+		} else {
+			h.writeJSONRPCError(w, req.ID, CodeCustomError, err.Error())
+		}
 		incRequestErrorCount(methodForMetrics, h.ServerName)
 		incRequestDurationStep(time.Since(stepStartAt), methodForMetrics, h.ServerName, "call", bigRequest)
 		return
@@ -328,7 +336,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// write response
 	rawMessageResult := json.RawMessage(marshaledResult)
-	res := jsonRPCResponse{
+	res := JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  &rawMessageResult,
