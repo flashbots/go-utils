@@ -43,10 +43,11 @@ const (
 )
 
 type (
-	highPriorityKey struct{}
-	signerKey       struct{}
-	originKey       struct{}
-	sizeKey         struct{}
+	highPriorityKey     struct{}
+	signerKey           struct{}
+	originKey           struct{}
+	sizeKey             struct{}
+	headersToForwardKey struct{}
 )
 
 type jsonRPCRequest struct {
@@ -75,7 +76,8 @@ func (e *JSONRPCError) Error() string {
 
 type JSONRPCHandler struct {
 	JSONRPCHandlerOpts
-	methods map[string]methodHandler
+	methods          map[string]methodHandler
+	headersToForward map[string]bool
 }
 
 type Methods map[string]any
@@ -104,6 +106,8 @@ type JSONRPCHandlerOpts struct {
 	// Custom handler for /readyz endpoint. If not nil then it is expected to write the response to the provided ResponseWriter.
 	// If the custom handler returns an error, the error message is written to the ResponseWriter with a 500 status code.
 	ReadyHandler func(w http.ResponseWriter, r *http.Request) error
+
+	HeadersToForward []string
 }
 
 // NewJSONRPCHandler creates JSONRPC http.Handler from the map that maps method names to method functions
@@ -117,6 +121,11 @@ func NewJSONRPCHandler(methods Methods, opts JSONRPCHandlerOpts) (*JSONRPCHandle
 		opts.MaxRequestBodySizeBytes = int64(DefaultMaxRequestBodySizeBytes)
 	}
 
+	headersToForward := make(map[string]bool)
+	for _, h := range opts.HeadersToForward {
+		headersToForward[strings.ToLower(h)] = true
+	}
+
 	m := make(map[string]methodHandler)
 	for name, fn := range methods {
 		method, err := getMethodTypes(fn)
@@ -128,6 +137,7 @@ func NewJSONRPCHandler(methods Methods, opts JSONRPCHandlerOpts) (*JSONRPCHandle
 	return &JSONRPCHandler{
 		JSONRPCHandlerOpts: opts,
 		methods:            m,
+		headersToForward:   headersToForward,
 	}, nil
 }
 
@@ -155,6 +165,21 @@ func (h *JSONRPCHandler) writeJSONRPCError(w http.ResponseWriter, id any, code i
 		},
 	}
 	h.writeJSONRPCResponse(w, res)
+}
+
+func (h *JSONRPCHandler) forwardHeaders(headers http.Header) http.Header {
+	result := make(http.Header)
+	if len(h.headersToForward) == 0 {
+		return result
+	}
+
+	for k, v := range headers {
+		if h.headersToForward[strings.ToLower(k)] {
+			result[k] = v
+		}
+	}
+
+	return result
 }
 
 func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -297,6 +322,11 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	headersToForward := h.forwardHeaders(r.Header)
+	if len(headersToForward) != 0 {
+		ctx = context.WithValue(ctx, headersToForwardKey{}, headersToForward)
+	}
+
 	// get method
 	method, ok := h.methods[req.Method]
 	if !ok {
@@ -367,6 +397,14 @@ func GetOrigin(ctx context.Context) string {
 	value, ok := ctx.Value(originKey{}).(string)
 	if !ok {
 		return ""
+	}
+	return value
+}
+
+func GetHeaders(ctx context.Context) http.Header {
+	value, ok := ctx.Value(headersToForwardKey{}).(http.Header)
+	if !ok {
+		return http.Header{}
 	}
 	return value
 }
