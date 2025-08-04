@@ -18,6 +18,7 @@ import (
 	"github.com/goccy/go-json"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/flashbots/go-utils/pkg/httputil"
 	"github.com/flashbots/go-utils/signature"
 )
 
@@ -43,11 +44,10 @@ const (
 )
 
 type (
-	highPriorityKey     struct{}
-	signerKey           struct{}
-	originKey           struct{}
-	sizeKey             struct{}
-	headersToForwardKey struct{}
+	highPriorityKey struct{}
+	signerKey       struct{}
+	originKey       struct{}
+	sizeKey         struct{}
 )
 
 type jsonRPCRequest struct {
@@ -76,8 +76,8 @@ func (e *JSONRPCError) Error() string {
 
 type JSONRPCHandler struct {
 	JSONRPCHandlerOpts
-	methods          map[string]methodHandler
-	headersToForward map[string]bool
+	methods        map[string]methodHandler
+	dynamicHeaders map[string]bool
 }
 
 type Methods map[string]any
@@ -137,7 +137,7 @@ func NewJSONRPCHandler(methods Methods, opts JSONRPCHandlerOpts) (*JSONRPCHandle
 	return &JSONRPCHandler{
 		JSONRPCHandlerOpts: opts,
 		methods:            m,
-		headersToForward:   headersToForward,
+		dynamicHeaders:     headersToForward,
 	}, nil
 }
 
@@ -167,14 +167,14 @@ func (h *JSONRPCHandler) writeJSONRPCError(w http.ResponseWriter, id any, code i
 	h.writeJSONRPCResponse(w, res)
 }
 
-func (h *JSONRPCHandler) forwardHeaders(headers http.Header) http.Header {
+func (h *JSONRPCHandler) forwardDynHeaders(headers http.Header) http.Header {
 	result := make(http.Header)
-	if len(h.headersToForward) == 0 {
+	if len(h.dynamicHeaders) == 0 {
 		return result
 	}
 
 	for k, v := range headers {
-		if h.headersToForward[strings.ToLower(k)] {
+		if h.dynamicHeaders[strings.ToLower(k)] {
 			result[k] = v
 		}
 	}
@@ -322,9 +322,9 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	headersToForward := h.forwardHeaders(r.Header)
-	if len(headersToForward) != 0 {
-		ctx = context.WithValue(ctx, headersToForwardKey{}, headersToForward)
+	dynHeaders := h.forwardDynHeaders(r.Header)
+	if len(dynHeaders) != 0 {
+		ctx = httputil.CtxWithHeaders(ctx, dynHeaders)
 	}
 
 	// get method
@@ -397,14 +397,6 @@ func GetOrigin(ctx context.Context) string {
 	value, ok := ctx.Value(originKey{}).(string)
 	if !ok {
 		return ""
-	}
-	return value
-}
-
-func GetHeaders(ctx context.Context) http.Header {
-	value, ok := ctx.Value(headersToForwardKey{}).(http.Header)
-	if !ok {
-		return http.Header{}
 	}
 	return value
 }

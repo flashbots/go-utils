@@ -18,14 +18,13 @@ import (
 
 	"github.com/goccy/go-json"
 
+	"github.com/flashbots/go-utils/pkg/httputil"
 	"github.com/flashbots/go-utils/signature"
 )
 
 const (
 	jsonrpcVersion = "2.0"
 )
-
-type dynamicHeadersCtxKey struct{}
 
 // RPCClient sends JSON-RPC requests over HTTP to the provided JSON-RPC backend.
 //
@@ -419,7 +418,7 @@ func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	dynamicHeaders := DynamicHeadersFromCtx(ctx)
+	dynamicHeaders := httputil.DynamicHeadersFromCtx(ctx)
 	for k, v := range dynamicHeaders {
 		for _, val := range v {
 			request.Header.Add(k, val)
@@ -631,18 +630,4 @@ func (RPCResponse *RPCResponse) GetObject(toType any) error {
 	}
 
 	return nil
-}
-
-func CtxWithHeaders(ctx context.Context, headers http.Header) context.Context {
-	ctx = context.WithValue(ctx, dynamicHeadersCtxKey{}, headers)
-	return ctx
-}
-
-func DynamicHeadersFromCtx(ctx context.Context) http.Header {
-	val, ok := ctx.Value(dynamicHeadersCtxKey{}).(http.Header)
-	if !ok {
-		return nil
-	}
-
-	return val
 }
