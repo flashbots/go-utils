@@ -18,7 +18,6 @@ import (
 	"github.com/goccy/go-json"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/flashbots/go-utils/pkg/httputil"
 	"github.com/flashbots/go-utils/signature"
 )
 
@@ -76,8 +75,7 @@ func (e *JSONRPCError) Error() string {
 
 type JSONRPCHandler struct {
 	JSONRPCHandlerOpts
-	methods        map[string]methodHandler
-	dynamicHeaders map[string]bool
+	methods map[string]methodHandler
 }
 
 type Methods map[string]any
@@ -106,8 +104,6 @@ type JSONRPCHandlerOpts struct {
 	// Custom handler for /readyz endpoint. If not nil then it is expected to write the response to the provided ResponseWriter.
 	// If the custom handler returns an error, the error message is written to the ResponseWriter with a 500 status code.
 	ReadyHandler func(w http.ResponseWriter, r *http.Request) error
-
-	HeadersToForward []string
 }
 
 // NewJSONRPCHandler creates JSONRPC http.Handler from the map that maps method names to method functions
@@ -121,11 +117,6 @@ func NewJSONRPCHandler(methods Methods, opts JSONRPCHandlerOpts) (*JSONRPCHandle
 		opts.MaxRequestBodySizeBytes = int64(DefaultMaxRequestBodySizeBytes)
 	}
 
-	headersToForward := make(map[string]bool)
-	for _, h := range opts.HeadersToForward {
-		headersToForward[strings.ToLower(h)] = true
-	}
-
 	m := make(map[string]methodHandler)
 	for name, fn := range methods {
 		method, err := getMethodTypes(fn)
@@ -137,7 +128,6 @@ func NewJSONRPCHandler(methods Methods, opts JSONRPCHandlerOpts) (*JSONRPCHandle
 	return &JSONRPCHandler{
 		JSONRPCHandlerOpts: opts,
 		methods:            m,
-		dynamicHeaders:     headersToForward,
 	}, nil
 }
 
@@ -165,21 +155,6 @@ func (h *JSONRPCHandler) writeJSONRPCError(w http.ResponseWriter, id any, code i
 		},
 	}
 	h.writeJSONRPCResponse(w, res)
-}
-
-func (h *JSONRPCHandler) forwardDynHeaders(headers http.Header) http.Header {
-	result := make(http.Header)
-	if len(h.dynamicHeaders) == 0 {
-		return result
-	}
-
-	for k, v := range headers {
-		if h.dynamicHeaders[strings.ToLower(k)] {
-			result[k] = v
-		}
-	}
-
-	return result
 }
 
 func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -320,11 +295,6 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			ctx = context.WithValue(ctx, originKey{}, origin)
 		}
-	}
-
-	dynHeaders := h.forwardDynHeaders(r.Header)
-	if len(dynHeaders) != 0 {
-		ctx = httputil.CtxWithHeaders(ctx, dynHeaders)
 	}
 
 	// get method

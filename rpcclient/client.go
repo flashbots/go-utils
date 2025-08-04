@@ -18,7 +18,6 @@ import (
 
 	"github.com/goccy/go-json"
 
-	"github.com/flashbots/go-utils/pkg/httputil"
 	"github.com/flashbots/go-utils/signature"
 )
 
@@ -119,6 +118,22 @@ type RPCClient interface {
 	// - the id's must be mapped against the id's you provided
 	// - RPCPersponses is enriched with helper functions e.g.: responses.HasError() returns  true if one of the responses holds an RPCError
 	CallBatchRaw(ctx context.Context, requests RPCRequests) (RPCResponses, error)
+}
+
+type dynamicHeadersCtxKey struct{}
+
+func CtxWithHeaders(ctx context.Context, headers map[string]string) context.Context {
+	ctx = context.WithValue(ctx, dynamicHeadersCtxKey{}, headers)
+	return ctx
+}
+
+func DynamicHeadersFromCtx(ctx context.Context) map[string]string {
+	val, ok := ctx.Value(dynamicHeadersCtxKey{}).(map[string]string)
+	if !ok {
+		return nil
+	}
+
+	return val
 }
 
 // RPCRequest represents a JSON-RPC request object.
@@ -418,11 +433,9 @@ func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	dynamicHeaders := httputil.DynamicHeadersFromCtx(ctx)
+	dynamicHeaders := DynamicHeadersFromCtx(ctx)
 	for k, v := range dynamicHeaders {
-		for _, val := range v {
-			request.Header.Add(k, val)
-		}
+		request.Header.Set(k, v)
 	}
 
 	if client.signer != nil {
