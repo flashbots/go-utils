@@ -25,6 +25,8 @@ const (
 	jsonrpcVersion = "2.0"
 )
 
+type dynamicHeadersCtxKey struct{}
+
 // RPCClient sends JSON-RPC requests over HTTP to the provided JSON-RPC backend.
 //
 // RPCClient is created using the factory function NewClient().
@@ -417,6 +419,13 @@ func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
+	dynamicHeaders := DynamicHeadersFromCtx(ctx)
+	for k, v := range dynamicHeaders {
+		for _, val := range v {
+			request.Header.Add(k, val)
+		}
+	}
+
 	if client.signer != nil {
 		signatureHeader, err := client.signer.Create(body)
 		if err != nil {
@@ -622,4 +631,18 @@ func (RPCResponse *RPCResponse) GetObject(toType any) error {
 	}
 
 	return nil
+}
+
+func CtxWithHeaders(ctx context.Context, headers http.Header) context.Context {
+	ctx = context.WithValue(ctx, dynamicHeadersCtxKey{}, headers)
+	return ctx
+}
+
+func DynamicHeadersFromCtx(ctx context.Context) http.Header {
+	val, ok := ctx.Value(dynamicHeadersCtxKey{}).(http.Header)
+	if !ok {
+		return nil
+	}
+
+	return val
 }
