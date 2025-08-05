@@ -270,6 +270,7 @@ type rpcClient struct {
 	defaultRequestID            int
 	signer                      *signature.Signer
 	rejectBrokenFlashbotsErrors bool
+	debug                       bool
 }
 
 // RPCClientOpts can be provided to NewClientWithOpts() to change configuration of RPCClient.
@@ -291,6 +292,8 @@ type RPCClientOpts struct {
 	// otherwise this response will be converted to equivalent {"error": {"message": "text", "code": FlashbotsBrokenErrorResponseCode}}
 	// Bad errors are always rejected for batch requests
 	RejectBrokenFlashbotsErrors bool
+
+	Debug bool
 }
 
 // RPCResponses is of type []*RPCResponse.
@@ -372,6 +375,7 @@ func NewClientWithOpts(endpoint string, opts *RPCClientOpts) RPCClient {
 	rpcClient.defaultRequestID = opts.DefaultRequestID
 	rpcClient.signer = opts.Signer
 	rpcClient.rejectBrokenFlashbotsErrors = opts.RejectBrokenFlashbotsErrors
+	rpcClient.debug = opts.Debug
 
 	return rpcClient
 }
@@ -464,6 +468,12 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	if err != nil {
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, client.endpoint, err)
 	}
+
+	if client.debug {
+		rawReqBody, _ := json.Marshal(RPCRequest)
+		fmt.Println("requestBody:", rawReqBody)
+	}
+
 	httpResponse, err := client.httpClient.Do(httpRequest)
 	if err != nil {
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, httpRequest.URL.Redacted(), err)
@@ -473,6 +483,12 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	body, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, httpRequest.URL.Redacted(), err)
+	}
+
+	if client.debug {
+		rawRespBody, _ := json.Marshal(body)
+		fmt.Println("respBody:", string(rawRespBody))
+		fmt.Println("respCode:", httpResponse.StatusCode)
 	}
 
 	decodeJSONBody := func(v any) error {
