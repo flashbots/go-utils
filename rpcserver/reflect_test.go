@@ -160,6 +160,9 @@ func TestCall(t *testing.T) {
 
 		return errorOut
 	}
+	functionVariadic := func(ctx context.Context, args ...int) error {
+		return nil
+	}
 
 	testCases := map[string]struct {
 		function      interface{}
@@ -202,6 +205,12 @@ func TestCall(t *testing.T) {
 			args:          `[1]`,
 			expectedValue: nil,
 			expectedError: errorOut,
+		},
+		"functionVariadic": {
+			function:      functionVariadic,
+			args:          "[1,2,3]",
+			expectedValue: nil,
+			expectedError: nil,
 		},
 	}
 

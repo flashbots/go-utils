@@ -13,14 +13,16 @@ var (
 	ErrMustReturnError     = errors.New("function must return error as a last return value")
 	ErrMustHaveContext     = errors.New("function must have context.Context as a first argument")
 	ErrTooManyReturnValues = errors.New("too many return values")
+	ErrVariadicArgument    = errors.New("variadic argument is only allowed to be sole")
 
 	ErrTooMuchArguments = errors.New("too much arguments")
 )
 
 type methodHandler struct {
-	in  []reflect.Type
-	out []reflect.Type
-	fn  any
+	in         []reflect.Type
+	out        []reflect.Type
+	fn         any
+	isVariadic bool
 }
 
 func getMethodTypes(fn interface{}) (methodHandler, error) {
@@ -28,6 +30,7 @@ func getMethodTypes(fn interface{}) (methodHandler, error) {
 	if fnType.Kind() != reflect.Func {
 		return methodHandler{}, ErrNotFunction
 	}
+	isVariadic := fnType.IsVariadic()
 	numIn := fnType.NumIn()
 	in := make([]reflect.Type, numIn)
 	for i := 0; i < numIn; i++ {
@@ -36,6 +39,9 @@ func getMethodTypes(fn interface{}) (methodHandler, error) {
 	// first input argument must be context.Context
 	if numIn == 0 || in[0] != reflect.TypeOf((*context.Context)(nil)).Elem() {
 		return methodHandler{}, ErrMustHaveContext
+	}
+	if numIn != 2 && isVariadic {
+		return methodHandler{}, ErrVariadicArgument
 	}
 
 	numOut := fnType.NumOut()
@@ -54,11 +60,20 @@ func getMethodTypes(fn interface{}) (methodHandler, error) {
 		return methodHandler{}, ErrTooManyReturnValues
 	}
 
-	return methodHandler{in, out, fn}, nil
+	return methodHandler{in, out, fn, isVariadic}, nil
 }
 
 func (h methodHandler) call(ctx context.Context, params []json.RawMessage) (any, error) {
-	args, err := extractArgumentsFromJSONparamsArray(h.in[1:], params)
+	var funcArgTypes []reflect.Type
+	if len(h.in) == 2 && h.isVariadic {
+		funcArgTypes = make([]reflect.Type, len(params))
+		for i := range funcArgTypes {
+			funcArgTypes[i] = h.in[1].Elem()
+		}
+	} else {
+		funcArgTypes = h.in[1:]
+	}
+	args, err := extractArgumentsFromJSONparamsArray(funcArgTypes, params)
 	if err != nil {
 		return nil, err
 	}
