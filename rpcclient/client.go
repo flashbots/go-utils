@@ -471,7 +471,7 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 
 	if client.debug {
 		rawReqBody, _ := json.Marshal(RPCRequest)
-		fmt.Println("requestBody:", rawReqBody)
+		fmt.Println("requestBody:", string(rawReqBody))
 	}
 
 	httpResponse, err := client.httpClient.Do(httpRequest)
@@ -486,8 +486,7 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	}
 
 	if client.debug {
-		rawRespBody, _ := json.Marshal(body)
-		fmt.Println("respBody:", string(rawRespBody))
+		fmt.Println("respBody:", string(body))
 		fmt.Println("respCode:", httpResponse.StatusCode)
 	}
 
