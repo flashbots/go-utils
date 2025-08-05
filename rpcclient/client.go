@@ -429,6 +429,10 @@ func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request
 		return nil, err
 	}
 
+	if client.debug {
+		fmt.Println("requestBody:", string(body))
+	}
+
 	request, err := http.NewRequestWithContext(ctx, "POST", client.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -467,11 +471,6 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	httpRequest, err := client.newRequest(ctx, RPCRequest)
 	if err != nil {
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, client.endpoint, err)
-	}
-
-	if client.debug {
-		rawReqBody, _ := json.Marshal(RPCRequest)
-		fmt.Println("requestBody:", string(rawReqBody))
 	}
 
 	httpResponse, err := client.httpClient.Do(httpRequest)
