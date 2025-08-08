@@ -104,6 +104,8 @@ type JSONRPCHandlerOpts struct {
 	// Custom handler for /readyz endpoint. If not nil then it is expected to write the response to the provided ResponseWriter.
 	// If the custom handler returns an error, the error message is written to the ResponseWriter with a 500 status code.
 	ReadyHandler func(w http.ResponseWriter, r *http.Request) error
+
+	ForbidEmptySigner bool
 }
 
 // NewJSONRPCHandler creates JSONRPC http.Handler from the map that maps method names to method functions
@@ -236,6 +238,15 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		incRequestDurationStep(stepTime, methodForMetrics, h.ServerName, "io", bigRequest)
 	}(stepTime)
 	stepStartAt = time.Now()
+
+	if h.ForbidEmptySigner {
+		signatureHeader := r.Header.Get("x-flashbots-signature")
+		if signatureHeader == "" {
+			h.writeJSONRPCError(w, nil, CodeInvalidRequest, "signature is required")
+			incIncorrectRequest(h.ServerName)
+			return
+		}
+	}
 
 	if h.VerifyRequestSignatureFromHeader {
 		signatureHeader := r.Header.Get("x-flashbots-signature")
