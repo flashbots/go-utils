@@ -13,7 +13,7 @@ var (
 	ErrMustReturnError     = errors.New("function must return error as a last return value")
 	ErrMustHaveContext     = errors.New("function must have context.Context as a first argument")
 	ErrTooManyReturnValues = errors.New("too many return values")
-	ErrVariadicArgument    = errors.New("variadic argument is only allowed to be sole")
+	ErrVariadicArgument    = errors.New("unsupported function signature: functions with variadic arguments support one and only variadic argument")
 
 	ErrTooMuchArguments = errors.New("too much arguments")
 )
