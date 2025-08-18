@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -263,6 +264,7 @@ func (e *HTTPError) Error() string {
 }
 
 type rpcClient struct {
+	log                         *slog.Logger
 	endpoint                    string
 	httpClient                  *http.Client
 	customHeaders               map[string]string
@@ -270,7 +272,6 @@ type rpcClient struct {
 	defaultRequestID            int
 	signer                      *signature.Signer
 	rejectBrokenFlashbotsErrors bool
-	debug                       bool
 }
 
 // RPCClientOpts can be provided to NewClientWithOpts() to change configuration of RPCClient.
@@ -281,6 +282,7 @@ type rpcClient struct {
 //
 // AllowUnknownFields: allows the rpc response to contain fields that are not defined in the rpc response specification.
 type RPCClientOpts struct {
+	Log                *slog.Logger
 	HTTPClient         *http.Client
 	CustomHeaders      map[string]string
 	AllowUnknownFields bool
@@ -292,8 +294,6 @@ type RPCClientOpts struct {
 	// otherwise this response will be converted to equivalent {"error": {"message": "text", "code": FlashbotsBrokenErrorResponseCode}}
 	// Bad errors are always rejected for batch requests
 	RejectBrokenFlashbotsErrors bool
-
-	Debug bool
 }
 
 // RPCResponses is of type []*RPCResponse.
@@ -354,6 +354,11 @@ func NewClientWithOpts(endpoint string, opts *RPCClientOpts) RPCClient {
 		customHeaders: make(map[string]string),
 	}
 
+	rpcClient.log = slog.Default()
+	if opts != nil && opts.Log != nil {
+		rpcClient.log = opts.Log
+	}
+
 	if opts == nil {
 		return rpcClient
 	}
@@ -375,7 +380,6 @@ func NewClientWithOpts(endpoint string, opts *RPCClientOpts) RPCClient {
 	rpcClient.defaultRequestID = opts.DefaultRequestID
 	rpcClient.signer = opts.Signer
 	rpcClient.rejectBrokenFlashbotsErrors = opts.RejectBrokenFlashbotsErrors
-	rpcClient.debug = opts.Debug
 
 	return rpcClient
 }
@@ -429,9 +433,7 @@ func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request
 		return nil, err
 	}
 
-	if client.debug {
-		fmt.Println("requestBody:", string(body))
-	}
+	client.log.Debug("RPC Client debug mode newRequest: request body", slog.Any("body", string(body)))
 
 	request, err := http.NewRequestWithContext(ctx, "POST", client.endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -484,10 +486,7 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, httpRequest.URL.Redacted(), err)
 	}
 
-	if client.debug {
-		fmt.Println("respBody:", string(body))
-		fmt.Println("respCode:", httpResponse.StatusCode)
-	}
+	client.log.Debug("RPC Client debug mode doCall: response", slog.Any("responseBody", string(body)), slog.Any("respCode", httpResponse.StatusCode))
 
 	decodeJSONBody := func(v any) error {
 		decoder := json.NewDecoder(bytes.NewReader(body))
