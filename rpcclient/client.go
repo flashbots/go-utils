@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -118,6 +119,22 @@ type RPCClient interface {
 	// - the id's must be mapped against the id's you provided
 	// - RPCPersponses is enriched with helper functions e.g.: responses.HasError() returns  true if one of the responses holds an RPCError
 	CallBatchRaw(ctx context.Context, requests RPCRequests) (RPCResponses, error)
+}
+
+type dynamicHeadersCtxKey struct{}
+
+func CtxWithHeaders(ctx context.Context, headers map[string]string) context.Context {
+	ctx = context.WithValue(ctx, dynamicHeadersCtxKey{}, headers)
+	return ctx
+}
+
+func DynamicHeadersFromCtx(ctx context.Context) map[string]string {
+	val, ok := ctx.Value(dynamicHeadersCtxKey{}).(map[string]string)
+	if !ok {
+		return nil
+	}
+
+	return val
 }
 
 // RPCRequest represents a JSON-RPC request object.
@@ -247,6 +264,7 @@ func (e *HTTPError) Error() string {
 }
 
 type rpcClient struct {
+	log                         *slog.Logger
 	endpoint                    string
 	httpClient                  *http.Client
 	customHeaders               map[string]string
@@ -264,6 +282,7 @@ type rpcClient struct {
 //
 // AllowUnknownFields: allows the rpc response to contain fields that are not defined in the rpc response specification.
 type RPCClientOpts struct {
+	Log                *slog.Logger
 	HTTPClient         *http.Client
 	CustomHeaders      map[string]string
 	AllowUnknownFields bool
@@ -333,6 +352,11 @@ func NewClientWithOpts(endpoint string, opts *RPCClientOpts) RPCClient {
 		endpoint:      endpoint,
 		httpClient:    &http.Client{},
 		customHeaders: make(map[string]string),
+	}
+
+	rpcClient.log = slog.Default()
+	if opts != nil && opts.Log != nil {
+		rpcClient.log = opts.Log
 	}
 
 	if opts == nil {
@@ -409,6 +433,8 @@ func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request
 		return nil, err
 	}
 
+	client.log.Debug("RPC Client debug mode newRequest: request body", slog.Any("body", string(body)))
+
 	request, err := http.NewRequestWithContext(ctx, "POST", client.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -416,6 +442,11 @@ func (client *rpcClient) newRequest(ctx context.Context, req any) (*http.Request
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
+
+	dynamicHeaders := DynamicHeadersFromCtx(ctx)
+	for k, v := range dynamicHeaders {
+		request.Header.Set(k, v)
+	}
 
 	if client.signer != nil {
 		signatureHeader, err := client.signer.Create(body)
@@ -443,6 +474,7 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	if err != nil {
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, client.endpoint, err)
 	}
+
 	httpResponse, err := client.httpClient.Do(httpRequest)
 	if err != nil {
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, httpRequest.URL.Redacted(), err)
@@ -453,6 +485,8 @@ func (client *rpcClient) doCall(ctx context.Context, RPCRequest *RPCRequest) (*R
 	if err != nil {
 		return nil, fmt.Errorf("rpc call %v() on %v: %w", RPCRequest.Method, httpRequest.URL.Redacted(), err)
 	}
+
+	client.log.Debug("RPC Client debug mode doCall: response", slog.Any("responseBody", string(body)), slog.Any("respCode", httpResponse.StatusCode))
 
 	decodeJSONBody := func(v any) error {
 		decoder := json.NewDecoder(bytes.NewReader(body))
