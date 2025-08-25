@@ -1050,7 +1050,7 @@ func TestCallFlashbots(t *testing.T) {
 	// check.Contains(err.Error(), "rpc response error")
 	check.NotNil(res)
 	check.NotNil(res.Error)
-	check.Equal("missing block param", res.Error.Message)
+	check.Equal("missing blockNumber param", res.Error.Message)
 	check.Equal(-32602, res.Error.Code)
 }
 
