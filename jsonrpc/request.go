@@ -37,6 +37,8 @@ func SendJSONRPCRequest(req JSONRPCRequest, url string) (res *JSONRPCResponse, e
 		return nil, err
 	}
 
+	defer rawResp.Body.Close()
+
 	res = new(JSONRPCResponse)
 	if err := json.NewDecoder(rawResp.Body).Decode(res); err != nil {
 		return nil, err
