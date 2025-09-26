@@ -48,7 +48,7 @@ type EthSendBundleArgs struct {
 	MinTimestamp      *uint64         `json:"minTimestamp,omitempty"`
 	MaxTimestamp      *uint64         `json:"maxTimestamp,omitempty"`
 	RevertingTxHashes []common.Hash   `json:"revertingTxHashes,omitempty"`
-	ReplacementUUID   *string         `json:"replacementUuid,omitempty"`
+	ReplacementUUID   *uuid.UUID      `json:"replacementUuid,omitempty"`
 	Version           *string         `json:"version,omitempty"`
 
 	ReplacementNonce *uint64         `json:"replacementNonce,omitempty"`
@@ -56,10 +56,12 @@ type EthSendBundleArgs struct {
 	RefundIdentity   *common.Address `json:"refundIdentity,omitempty"` // metadata field to improve redistribution ux
 
 	DroppingTxHashes []common.Hash   `json:"droppingTxHashes,omitempty"`
-	UUID             *string         `json:"uuid,omitempty"`
+	UUID             *uuid.UUID      `json:"uuid,omitempty"`
 	RefundPercent    *uint64         `json:"refundPercent,omitempty"`
 	RefundRecipient  *common.Address `json:"refundRecipient,omitempty"`
 	RefundTxHashes   []string        `json:"refundTxHashes,omitempty"`
+	// if set to true refund will be paid out of block
+	DelayedRefund *bool `json:"delayedRefund,omitempty"`
 }
 
 const (
@@ -106,7 +108,7 @@ type MevBundleMetadata struct {
 
 type MevSendBundleArgs struct {
 	Version         string             `json:"version"`
-	ReplacementUUID string             `json:"replacementUuid,omitempty"`
+	ReplacementUUID *uuid.UUID         `json:"replacementUuid,omitempty"`
 	Inclusion       MevBundleInclusion `json:"inclusion"`
 	// when empty its considered cancel
 	Body     []MevBundleBody    `json:"body"`
@@ -184,7 +186,7 @@ func (b *EthSendBundleArgs) UniqueKey() uuid.UUID {
 		_, _ = hash.Write(txHash.Bytes())
 	}
 	if b.ReplacementUUID != nil {
-		_, _ = hash.Write([]byte(*b.ReplacementUUID))
+		_, _ = hash.Write((*b.ReplacementUUID)[:])
 	}
 	if b.ReplacementNonce != nil {
 		_ = binary.Write(hash, binary.LittleEndian, *b.ReplacementNonce)
@@ -371,7 +373,9 @@ func (b *MevSendBundleArgs) UniqueKey() uuid.UUID {
 }
 
 func uniqueKeyMevSendBundle(b *MevSendBundleArgs, hash hash.Hash) {
-	hash.Write([]byte(b.ReplacementUUID))
+	if b.ReplacementUUID != nil {
+		hash.Write(b.ReplacementUUID[:])
+	}
 	_ = binary.Write(hash, binary.LittleEndian, b.Inclusion.BlockNumber)
 	_ = binary.Write(hash, binary.LittleEndian, b.Inclusion.MaxBlock)
 	for _, body := range b.Body {
@@ -394,7 +398,7 @@ func uniqueKeyMevSendBundle(b *MevSendBundleArgs, hash hash.Hash) {
 func (b *MevSendBundleArgs) Validate() (common.Hash, error) {
 	// only cancell call can be without txs
 	// cancell call must have ReplacementUUID set
-	if len(b.Body) == 0 && b.ReplacementUUID == "" {
+	if len(b.Body) == 0 && b.ReplacementUUID == nil {
 		return common.Hash{}, ErrBundleNoTxs
 	}
 	return hashMevSendBundle(0, b)
