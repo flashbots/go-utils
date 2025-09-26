@@ -137,7 +137,7 @@ func (tx *EthSendRawTransactionArgs) UnmarshalText(input []byte) error {
 // eth_cancelBundle
 
 type EthCancelBundleArgs struct {
-	ReplacementUUID string          `json:"replacementUuid"`
+	ReplacementUUID uuid.UUID       `json:"replacementUuid"`
 	SigningAddress  *common.Address `json:"signingAddress"`
 }
 
@@ -436,7 +436,7 @@ func (tx *EthSendRawTransactionArgs) UniqueKey() uuid.UUID {
 
 func (b *EthCancelBundleArgs) UniqueKey() uuid.UUID {
 	hash := newHash()
-	_, _ = hash.Write([]byte(b.ReplacementUUID))
+	_, _ = hash.Write(b.ReplacementUUID[:])
 	_, _ = hash.Write(b.SigningAddress.Bytes())
 	return uuidFromHash(hash)
 }
