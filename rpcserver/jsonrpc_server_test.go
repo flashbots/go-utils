@@ -143,6 +143,33 @@ func TestJSONRPCServerDefaultLiveAndReady(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, rr.Code)
 }
 
+func TestJSONRPCErrorDataIsPreserved(t *testing.T) {
+	handlerMethod := func(ctx context.Context, arg int) (int, error) {
+		errorData := any("some error data")
+		return 0, &JSONRPCError{
+			Code:    1234,
+			Message: "test error",
+			Data:    &errorData,
+		}
+	}
+
+	handler, err := NewJSONRPCHandler(map[string]interface{}{
+		"testError": handlerMethod,
+	}, JSONRPCHandlerOpts{})
+	require.NoError(t, err)
+
+	httpServer := httptest.NewServer(handler)
+	defer httpServer.Close()
+
+	client := rpcclient.NewClient(httpServer.URL)
+	resp, err := client.Call(context.Background(), "testError", 1)
+	require.NoError(t, err)
+	require.NotNil(t, resp.Error)
+	require.Equal(t, 1234, resp.Error.Code)
+	require.Equal(t, "test error", resp.Error.Message)
+	require.Equal(t, "some error data", resp.Error.Data)
+}
+
 func TestJSONRPCServerReadyzOK(t *testing.T) {
 	handler := testHandler(JSONRPCHandlerOpts{
 		ReadyHandler: func(w http.ResponseWriter, r *http.Request) error {
