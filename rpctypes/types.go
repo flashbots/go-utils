@@ -60,8 +60,7 @@ type EthSendBundleArgs struct {
 	RefundPercent    *uint64         `json:"refundPercent,omitempty"`
 	RefundRecipient  *common.Address `json:"refundRecipient,omitempty"`
 	RefundTxHashes   []string        `json:"refundTxHashes,omitempty"`
-	// if set to true refund will be paid out of block
-	DelayedRefund *bool `json:"delayedRefund,omitempty"`
+	DelayedRefund    *bool           `json:"delayedRefund,omitempty"` // if set to true refund will be paid out of block
 }
 
 const (
