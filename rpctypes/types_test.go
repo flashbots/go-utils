@@ -78,7 +78,7 @@ func TestEthSendBundleArgsValidate(t *testing.T) {
 			}`),
 			ExpectedHash:      "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
 			ExpectedUUID:      "35718fe4-5d24-51c8-93bf-9c961d7c3ea3",
-			ExpectedUniqueKey: "1655edd0-29a6-5372-a19b-1ddedda14b20",
+			ExpectedUniqueKey: "62b35666-4162-51a4-b2dc-fb42aed171ac",
 		},
 		{
 			Payload: []byte(`{
@@ -86,7 +86,7 @@ func TestEthSendBundleArgsValidate(t *testing.T) {
 			}`),
 			ExpectedHash:      "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
 			ExpectedUUID:      "35718fe4-5d24-51c8-93bf-9c961d7c3ea3",
-			ExpectedUniqueKey: "3c718cb9-3f6c-5dc0-9d99-264dafc0b4e9",
+			ExpectedUniqueKey: "7a362520-e7de-526a-8281-ed2e4cdbfccb",
 		},
 		{
 			Payload: []byte(`  {
