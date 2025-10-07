@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,13 +41,19 @@ var (
 const (
 	maxOriginIDLength    = 255
 	requestSizeThreshold = 50_000
+
+	highPriorityHeader       = "high_prio"
+	builderNetSentAtHeader   = "X-BuilderNet-SentAtUs"
+	flashbotsSignatureHeader = "X-Flashbots-Signature"
+	flashbotsOriginHeader    = "X-Flashbots-Origin"
 )
 
 type (
-	highPriorityKey struct{}
-	signerKey       struct{}
-	originKey       struct{}
-	sizeKey         struct{}
+	highPriorityKey     struct{}
+	builderNetSentAtKey struct{}
+	signerKey           struct{}
+	originKey           struct{}
+	sizeKey             struct{}
 )
 
 type jsonRPCRequest struct {
@@ -96,6 +103,8 @@ type JSONRPCHandlerOpts struct {
 	// If true high_prio header value will be extracted (true or false)
 	// Result can be extracted from the context using GetHighPriority
 	ExtractPriorityFromHeader bool
+	// If true, extracts the `X-BuilderNet-SentAtUs` header value and sets it in the context.
+	ExtractBuilderNetSentAtFromHeader bool
 	// If true extract value from x-flashbots-origin header
 	// Result can be extracted from the context using GetOrigin
 	ExtractOriginFromHeader bool
@@ -240,7 +249,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	stepStartAt = time.Now()
 
 	if h.ForbidEmptySigner {
-		signatureHeader := r.Header.Get("x-flashbots-signature")
+		signatureHeader := r.Header.Get(flashbotsSignatureHeader)
 		if signatureHeader == "" {
 			h.writeJSONRPCError(w, nil, CodeInvalidRequest, "signature is required")
 			incIncorrectRequest(h.ServerName)
@@ -249,7 +258,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.VerifyRequestSignatureFromHeader {
-		signatureHeader := r.Header.Get("x-flashbots-signature")
+		signatureHeader := r.Header.Get(flashbotsSignatureHeader)
 		signer, err := signature.Verify(signatureHeader, body)
 		if err != nil {
 			h.writeJSONRPCError(w, nil, CodeInvalidRequest, err.Error())
@@ -289,15 +298,29 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.ExtractUnverifiedRequestSignatureFromHeader {
-		signature := r.Header.Get("x-flashbots-signature")
+		signature := r.Header.Get(flashbotsSignatureHeader)
 		if split := strings.Split(signature, ":"); len(split) > 0 {
 			signer := common.HexToAddress(split[0])
 			ctx = context.WithValue(ctx, signerKey{}, signer)
 		}
 	}
 
+	if h.ExtractBuilderNetSentAtFromHeader {
+		builderNetSentAt := r.Header.Get(builderNetSentAtHeader)
+		ts, err := strconv.ParseInt(builderNetSentAt, 10, 64)
+		if err == nil {
+			// Convert microseconds to seconds and nanoseconds
+			seconds := ts / 1e6
+			nanoseconds := (ts % 1e6) * 1e3 // Convert remaining microseconds to nanoseconds
+
+			// Create time.Time object
+			t := time.Unix(seconds, nanoseconds)
+			ctx = context.WithValue(ctx, builderNetSentAtKey{}, t)
+		}
+	}
+
 	if h.ExtractOriginFromHeader {
-		origin := r.Header.Get("x-flashbots-origin")
+		origin := r.Header.Get(flashbotsOriginHeader)
 		if origin != "" {
 			if len(origin) > maxOriginIDLength {
 				h.writeJSONRPCError(w, req.ID, CodeInvalidRequest, "x-flashbots-origin header is too long")
@@ -371,6 +394,15 @@ func GetSigner(ctx context.Context) common.Address {
 	if !ok {
 		return common.Address{}
 	}
+	return value
+}
+
+func GetBuilderNetSentAt(ctx context.Context) time.Time {
+	value, ok := ctx.Value(builderNetSentAtKey{}).(time.Time)
+	if !ok {
+		return time.Time{}
+	}
+
 	return value
 }
 
