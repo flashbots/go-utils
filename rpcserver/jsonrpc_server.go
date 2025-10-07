@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,10 +44,11 @@ const (
 )
 
 type (
-	highPriorityKey struct{}
-	signerKey       struct{}
-	originKey       struct{}
-	sizeKey         struct{}
+	highPriorityKey     struct{}
+	builderNetSentAtKey struct{}
+	signerKey           struct{}
+	originKey           struct{}
+	sizeKey             struct{}
 )
 
 type jsonRPCRequest struct {
@@ -96,6 +98,8 @@ type JSONRPCHandlerOpts struct {
 	// If true high_prio header value will be extracted (true or false)
 	// Result can be extracted from the context using GetHighPriority
 	ExtractPriorityFromHeader bool
+	// If true, extracts the `X-BuilderNet-SentAtUs` header value and sets it in the context.
+	ExtractBuilderNetSentAtFromHeader bool
 	// If true extract value from x-flashbots-origin header
 	// Result can be extracted from the context using GetOrigin
 	ExtractOriginFromHeader bool
@@ -296,6 +300,20 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if h.ExtractBuilderNetSentAtFromHeader {
+		builderNetSentAt := r.Header.Get("X-BuilderNet-SentAtUs")
+		ts, err := strconv.ParseInt(builderNetSentAt, 10, 64)
+		if err == nil {
+			// Convert microseconds to seconds and nanoseconds
+			seconds := ts / 1e6
+			nanoseconds := (ts % 1e6) * 1e3 // Convert remaining microseconds to nanoseconds
+
+			// Create time.Time object
+			t := time.Unix(seconds, nanoseconds)
+			ctx = context.WithValue(ctx, builderNetSentAtKey{}, t)
+		}
+	}
+
 	if h.ExtractOriginFromHeader {
 		origin := r.Header.Get("x-flashbots-origin")
 		if origin != "" {
@@ -371,6 +389,15 @@ func GetSigner(ctx context.Context) common.Address {
 	if !ok {
 		return common.Address{}
 	}
+	return value
+}
+
+func GetBuilderNetSentAt(ctx context.Context) time.Time {
+	value, ok := ctx.Value(builderNetSentAtKey{}).(time.Time)
+	if !ok {
+		return time.Time{}
+	}
+
 	return value
 }
 
