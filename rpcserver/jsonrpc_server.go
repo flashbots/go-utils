@@ -157,6 +157,14 @@ func (h *JSONRPCHandler) writeJSONRPCResponse(w http.ResponseWriter, response JS
 }
 
 func (h *JSONRPCHandler) writeJSONRPCError(w http.ResponseWriter, id any, code int, msg string) {
+	h.writeJSONRPCErrorWithData(w, id, code, msg, nil)
+}
+
+func (h *JSONRPCHandler) writeJSONRPCErrorWithData(w http.ResponseWriter, id any, code int, msg string, data any) {
+	var dataPtr *any
+	if data != nil {
+		dataPtr = &data
+	}
 	res := JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      id,
@@ -164,7 +172,7 @@ func (h *JSONRPCHandler) writeJSONRPCError(w http.ResponseWriter, id any, code i
 		Error: &JSONRPCError{
 			Code:    code,
 			Message: msg,
-			Data:    nil,
+			Data:    dataPtr,
 		},
 	}
 	h.writeJSONRPCResponse(w, res)
@@ -351,7 +359,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	result, err := method.call(ctx, req.Params)
 	if err != nil {
 		if jsonRPCErr, ok := err.(*JSONRPCError); ok {
-			h.writeJSONRPCError(w, req.ID, jsonRPCErr.Code, jsonRPCErr.Message)
+			h.writeJSONRPCErrorWithData(w, req.ID, jsonRPCErr.Code, jsonRPCErr.Message, jsonRPCErr.Data)
 		} else {
 			h.writeJSONRPCError(w, req.ID, CodeCustomError, err.Error())
 		}
