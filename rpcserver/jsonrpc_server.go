@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ type (
 	highPriorityKey     struct{}
 	builderNetSentAtKey struct{}
 	signerKey           struct{}
+	urlKey              struct{}
 	originKey           struct{}
 	sizeKey             struct{}
 )
@@ -267,6 +269,8 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx = context.WithValue(ctx, signerKey{}, signer)
 	}
+	// r.URL
+	ctx = context.WithValue(ctx, urlKey{}, r.URL)
 
 	// read request
 	var req jsonRPCRequest
@@ -416,4 +420,8 @@ func GetOrigin(ctx context.Context) string {
 
 func GetRequestSize(ctx context.Context) int {
 	return ctx.Value(sizeKey{}).(int)
+}
+
+func GetURL(ctx context.Context) *url.URL {
+	return ctx.Value(urlKey{}).(*url.URL)
 }
