@@ -296,4 +296,25 @@ func TestURLExtraction(t *testing.T) {
 		require.Equal(t, http.StatusOK, rr.Code)
 		require.Equal(t, "/fast?", capturedURL)
 	})
+
+	t.Run("Stage 2: Arbitrary paths work (/whatever, /anything, etc)", func(t *testing.T) {
+		// Verify that any path works, not just /fast (Tymur's requirement)
+		testPaths := []string{"/whatever", "/anything", "/custom-path", "/v1/special"}
+
+		for _, testPath := range testPaths {
+			body := bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"test","params":[]}`))
+			request, err := http.NewRequest(http.MethodPost, "/", body)
+			require.NoError(t, err)
+			request.Header.Add("Content-Type", "application/json")
+			request.Header.Add("X-Original-Path", testPath)
+			request.Header.Add("X-Original-Query", "param=value")
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, request)
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			expectedURL := testPath + "?param=value"
+			require.Equal(t, expectedURL, capturedURL, "Failed for path: %s", testPath)
+		}
+	})
 }
