@@ -277,8 +277,16 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx = context.WithValue(ctx, signerKey{}, signer)
 	}
-	// r.URL
-	ctx = context.WithValue(ctx, urlKey{}, r.URL)
+	// Extract URL from headers (Stage 2) or use r.URL directly (Stage 1)
+	reqURL := r.URL
+	if originalPath := r.Header.Get("X-Original-Path"); originalPath != "" {
+		// Stage 2: Reconstruct URL from headers sent by proxyd
+		reqURL = &url.URL{
+			Path:     originalPath,
+			RawQuery: r.Header.Get("X-Original-Query"),
+		}
+	}
+	ctx = context.WithValue(ctx, urlKey{}, reqURL)
 
 	// read request
 	var req jsonRPCRequest
