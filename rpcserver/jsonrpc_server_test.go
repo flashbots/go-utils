@@ -208,3 +208,62 @@ func TestJSONRPCServerReadyzError(t *testing.T) {
 	fmt.Println(rr.Body.String())
 	require.Equal(t, "not ready\n", rr.Body.String())
 }
+
+func TestURLExtraction(t *testing.T) {
+	// Handler that captures URL from context
+	var capturedURL string
+	handlerMethod := func(ctx context.Context) (string, error) {
+		url := GetURL(ctx)
+		capturedURL = url.Path + "?" + url.RawQuery
+		return capturedURL, nil
+	}
+
+	handler, err := NewJSONRPCHandler(map[string]interface{}{
+		"test": handlerMethod,
+	}, JSONRPCHandlerOpts{})
+	require.NoError(t, err)
+
+	t.Run("Stage 1: Direct URL (no headers)", func(t *testing.T) {
+		body := bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"test","params":[]}`))
+		request, err := http.NewRequest(http.MethodPost, "/fast?hint=calldata", body)
+		require.NoError(t, err)
+		request.Header.Add("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, request)
+
+		require.Equal(t, http.StatusOK, rr.Code)
+		require.Equal(t, "/fast?hint=calldata", capturedURL)
+	})
+
+	t.Run("Stage 2: Header-based URL", func(t *testing.T) {
+		body := bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"test","params":[]}`))
+		request, err := http.NewRequest(http.MethodPost, "/", body)
+		require.NoError(t, err)
+		request.Header.Add("Content-Type", "application/json")
+		request.Header.Add("X-Original-Path", "/fast")
+		request.Header.Add("X-Original-Query", "hint=calldata&builder=flashbots")
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, request)
+
+		require.Equal(t, http.StatusOK, rr.Code)
+		require.Equal(t, "/fast?hint=calldata&builder=flashbots", capturedURL)
+	})
+
+	t.Run("Stage 2: Headers override actual URL", func(t *testing.T) {
+		body := bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"test","params":[]}`))
+		request, err := http.NewRequest(http.MethodPost, "/api?wrong=params", body)
+		require.NoError(t, err)
+		request.Header.Add("Content-Type", "application/json")
+		request.Header.Add("X-Original-Path", "/fast")
+		request.Header.Add("X-Original-Query", "hint=hash")
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, request)
+
+		require.Equal(t, http.StatusOK, rr.Code)
+		// Headers take precedence
+		require.Equal(t, "/fast?hint=hash", capturedURL)
+	})
+}
