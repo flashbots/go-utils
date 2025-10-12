@@ -266,4 +266,34 @@ func TestURLExtraction(t *testing.T) {
 		// Headers take precedence
 		require.Equal(t, "/fast?hint=hash", capturedURL)
 	})
+
+	t.Run("Stage 2: Only query header (path is root)", func(t *testing.T) {
+		// Proxyd doesn't send X-Original-Path when path is "/"
+		body := bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"test","params":[]}`))
+		request, err := http.NewRequest(http.MethodPost, "/", body)
+		require.NoError(t, err)
+		request.Header.Add("Content-Type", "application/json")
+		request.Header.Add("X-Original-Query", "hint=hash")
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, request)
+
+		require.Equal(t, http.StatusOK, rr.Code)
+		require.Equal(t, "/?hint=hash", capturedURL)
+	})
+
+	t.Run("Stage 2: Only path header (no query)", func(t *testing.T) {
+		// Proxyd doesn't send X-Original-Query when there's no query string
+		body := bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"test","params":[]}`))
+		request, err := http.NewRequest(http.MethodPost, "/api", body)
+		require.NoError(t, err)
+		request.Header.Add("Content-Type", "application/json")
+		request.Header.Add("X-Original-Path", "/fast")
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, request)
+
+		require.Equal(t, http.StatusOK, rr.Code)
+		require.Equal(t, "/fast?", capturedURL)
+	})
 }
