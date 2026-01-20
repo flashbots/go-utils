@@ -450,6 +450,13 @@ func GetOrigin(ctx context.Context) string {
 	return value
 }
 
+// WithOrigin returns a new request with the origin set in its context.
+// Use this in middleware to set the origin for downstream handlers to read via GetOrigin.
+func WithOrigin(r *http.Request, origin string) *http.Request {
+	ctx := context.WithValue(r.Context(), originKey{}, origin)
+	return r.WithContext(ctx)
+}
+
 func GetRequestSize(ctx context.Context) int {
 	return ctx.Value(sizeKey{}).(int)
 }
