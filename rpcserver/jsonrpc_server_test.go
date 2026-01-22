@@ -282,3 +282,33 @@ func TestURLExtraction(t *testing.T) {
 		require.Equal(t, "/fast?", capturedURL)
 	})
 }
+
+func TestGetRequest(t *testing.T) {
+	var capturedUserAgent string
+	var capturedCustomHeader string
+	testHandler := func(ctx context.Context) (string, error) {
+		req := GetRequest(ctx)
+		capturedUserAgent = req.Header.Get("User-Agent")
+		capturedCustomHeader = req.Header.Get("X-Custom-Header")
+		return "ok", nil
+	}
+
+	handler, err := NewJSONRPCHandler(map[string]interface{}{
+		"test": testHandler,
+	}, JSONRPCHandlerOpts{})
+	require.NoError(t, err)
+
+	body := bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"test","params":[]}`))
+	request, err := http.NewRequest(http.MethodPost, "/", body)
+	require.NoError(t, err)
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("User-Agent", "test-client/1.0")
+	request.Header.Add("X-Custom-Header", "custom-value")
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, request)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.Equal(t, "test-client/1.0", capturedUserAgent)
+	require.Equal(t, "custom-value", capturedCustomHeader)
+}
