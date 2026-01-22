@@ -42,9 +42,10 @@ var (
 const (
 	requestSizeThreshold = 50_000
 
-	highPriorityHeader       = "high_prio"
-	builderNetSentAtHeader   = "X-BuilderNet-SentAtUs"
-	flashbotsSignatureHeader = "X-Flashbots-Signature"
+	highPriorityHeader     = "high_prio"
+	builderNetSentAtHeader = "X-BuilderNet-SentAtUs"
+
+	FlashbotsSignatureHeader = "X-Flashbots-Signature"
 	FlashbotsOriginHeader    = "X-Flashbots-Origin"
 	FlashbotsUserAgentHeader = "X-Flashbots-User-Agent"
 )
@@ -257,7 +258,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	stepStartAt = time.Now()
 
 	if h.ForbidEmptySigner {
-		signatureHeader := r.Header.Get(flashbotsSignatureHeader)
+		signatureHeader := r.Header.Get(FlashbotsSignatureHeader)
 		if signatureHeader == "" {
 			h.writeJSONRPCError(w, nil, CodeInvalidRequest, "signature is required")
 			incIncorrectRequest(h.ServerName)
@@ -266,7 +267,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.VerifyRequestSignatureFromHeader {
-		signatureHeader := r.Header.Get(flashbotsSignatureHeader)
+		signatureHeader := r.Header.Get(FlashbotsSignatureHeader)
 		signer, err := signature.Verify(signatureHeader, body)
 		if err != nil {
 			h.writeJSONRPCError(w, nil, CodeInvalidRequest, err.Error())
@@ -332,7 +333,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.ExtractUnverifiedRequestSignatureFromHeader {
-		signature := r.Header.Get(flashbotsSignatureHeader)
+		signature := r.Header.Get(FlashbotsSignatureHeader)
 		if split := strings.Split(signature, ":"); len(split) > 0 {
 			signer := common.HexToAddress(split[0])
 			ctx = context.WithValue(ctx, signerKey{}, signer)
