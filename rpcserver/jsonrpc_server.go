@@ -445,16 +445,6 @@ func GetRequest(ctx context.Context) *http.Request {
 	return req
 }
 
-// Header returns a header value from the request in context.
-// Returns empty string if header is not set or request is not in context.
-func Header(ctx context.Context, name string) string {
-	req := GetRequest(ctx)
-	if req == nil {
-		return ""
-	}
-	return req.Header.Get(name)
-}
-
 // TestContextWithRequest returns a context with the given HTTP request.
 // This is intended for use in tests only.
 func TestContextWithRequest(ctx context.Context, req *http.Request) context.Context {
