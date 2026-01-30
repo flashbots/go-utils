@@ -40,6 +40,7 @@ var (
 )
 
 const (
+	maxOriginIDLength    = 255
 	requestSizeThreshold = 50_000
 
 	highPriorityHeader     = "high_prio"
@@ -57,6 +58,7 @@ type (
 	urlKey              struct{}
 	sizeKey             struct{}
 	requestKey          struct{}
+	originKey           struct{}
 )
 
 type jsonRPCRequest struct {
@@ -108,6 +110,9 @@ type JSONRPCHandlerOpts struct {
 	ExtractPriorityFromHeader bool
 	// If true, extracts the `X-BuilderNet-SentAtUs` header value and sets it in the context.
 	ExtractBuilderNetSentAtFromHeader bool
+	// If true extract value from x-flashbots-origin header
+	// Result can be extracted from the context using GetOrigin
+	ExtractOriginFromHeader bool
 	// GET response content
 	GetResponseContent []byte
 	// Custom handler for /readyz endpoint. If not nil then it is expected to write the response to the provided ResponseWriter.
@@ -354,6 +359,18 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if h.ExtractOriginFromHeader {
+		origin := r.Header.Get(FlashbotsOriginHeader)
+		if origin != "" {
+			if len(origin) > maxOriginIDLength {
+				h.writeJSONRPCError(w, req.ID, CodeInvalidRequest, "x-flashbots-origin header is too long")
+				incIncorrectRequest(h.ServerName)
+				return
+			}
+			ctx = context.WithValue(ctx, originKey{}, origin)
+		}
+	}
+
 	// get method
 	method, ok := h.methods[req.Method]
 	if !ok {
@@ -427,6 +444,21 @@ func GetBuilderNetSentAt(ctx context.Context) time.Time {
 	}
 
 	return value
+}
+
+func GetOrigin(ctx context.Context) string {
+	value, ok := ctx.Value(originKey{}).(string)
+	if !ok {
+		return ""
+	}
+	return value
+}
+
+// WithOrigin returns a new request with the origin set in its context.
+// Use this in middleware to set the origin for downstream handlers to read via GetOrigin.
+func WithOrigin(r *http.Request, origin string) *http.Request {
+	ctx := context.WithValue(r.Context(), originKey{}, origin)
+	return r.WithContext(ctx)
 }
 
 func GetRequestSize(ctx context.Context) int {
