@@ -185,12 +185,31 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startAt := time.Now()
 	methodForMetrics := unknownMethodLabel
 	bigRequest := false
+	hasError := false
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, requestKey{}, r)
 
 	defer func() {
 		incRequestCount(methodForMetrics, h.ServerName, bigRequest)
 		incRequestDuration(time.Since(startAt), methodForMetrics, h.ServerName, bigRequest)
+
+		// Log request at INFO level for observability
+		if h.Log != nil && methodForMetrics != unknownMethodLabel {
+			duration := time.Since(startAt)
+			if hasError {
+				h.Log.Info("Request completed",
+					slog.String("method", methodForMetrics),
+					slog.Duration("duration", duration),
+					slog.String("status", "error"),
+					slog.String("server", h.ServerName))
+			} else {
+				h.Log.Info("Request completed",
+					slog.String("method", methodForMetrics),
+					slog.Duration("duration", duration),
+					slog.String("status", "ok"),
+					slog.String("server", h.ServerName))
+			}
+		}
 	}()
 
 	stepStartAt := time.Now()
@@ -386,6 +405,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// call method
 	result, err := method.call(ctx, req.Params)
 	if err != nil {
+		hasError = true
 		if jsonRPCErr, ok := err.(*JSONRPCError); ok {
 			h.writeJSONRPCErrorWithData(w, req.ID, jsonRPCErr.Code, jsonRPCErr.Message, jsonRPCErr.Data)
 		} else {
